@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerolamino connector demo</title>
+<style>
+    :root { color-scheme: dark; --bg: #0b0d12; --card: #141821; --text: #e8eaf0; --dim: #8a93a6; --border: #232a36; --accent: #ff2d55; }
+    body { margin: 0; padding: 24px; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 21px; margin: 0 0 4px; }
+    p { color: var(--dim); margin: 0 0 18px; }
+    pre { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow: auto; max-height: 45vh; font-size: 12px; }
+    code { color: var(--text); }
+    .note { margin-top: 22px; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+    <h1>Gerolamino connector demo</h1>
+    <p>The custom element detects Gerolamino without prompting. Clicking Connect asks once for this site.</p>
+    <gerolamino-connect poll="0"></gerolamino-connect>
+    <h2>Last event</h2>
+    <pre id="log">-</pre>
+    <p class="note">This page uses a fake provider so the connector can be exercised without the browser extension.</p>
+</main>
+<script>
+    // This is a demo stub, not a real Gerolamino extension. The real extension injects window.cardano.gerolamino.
+    const stub = (() => {
+        let enabled = false;
+        const api = {
+            query: async (path) => ({ status: 200, body: { path, demo: true, source: "local" }, source: "local" }),
+            submitTx: async (hex) => `txid-${String(hex).slice(0, 8)}`,
+            getNetworkId: async () => 0,
+            getTip: async () => ({ slot: 126619300, height: 9000, hash: "blockhash", network: "preview", state: "at-tip", peerTip: { slot: 126619360, height: 9001 } }),
+            getTrust: async () => ({ verdict: "verified", rows: [
+                { key: "signature", label: "Block signatures", value: "verified", tone: "ok" },
+                { key: "freshness", label: "Freshness", value: "1s", tone: "ok" }
+            ] })
+        };
+        return {
+            name: "Gerolamino (demo stub)",
+            apiVersion: "1",
+            dappApiVersion: "0.1.0",
+            isWallet: false,
+            isEnabled: async () => enabled,
+            enable: async () => { enabled = true; return api; }
+        };
+    })();
+
+    if (new URLSearchParams(location.search).has("stub")) {
+        window.cardano = { gerolamino: stub };
+    }
+
+    const log = document.getElementById("log");
+    for (const event of ["gerolamino:connected", "gerolamino:status", "gerolamino:disconnected", "gerolamino:error"]) {
+        document.addEventListener(event, (e) => {
+            log.textContent = event + ": " + JSON.stringify(e.detail);
+        });
+    }
+</script>
+<script src="../dist/ui/standalone.global.js"></script>
+</body>
+</html>

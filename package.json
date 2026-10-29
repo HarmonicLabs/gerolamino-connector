@@ -1,0 +1,63 @@
+{
+    "name": "@harmoniclabs/gerolamino-connector",
+    "version": "0.1.0",
+    "description": "Framework-neutral dApp connector for the Gerolamino browser node: prompt-free detection, explicit connect, node status, and a Blockfrost-shaped transport.",
+    "license": "MIT",
+    "author": "Harmonic Laboratories",
+    "type": "module",
+    "publishConfig": {
+        "access": "public"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/HarmonicLabs/gerolamino-connector.git"
+    },
+    "keywords": [
+        "cardano",
+        "gerolamino",
+        "gerolamo",
+        "connector",
+        "dapp",
+        "blockfrost"
+    ],
+    "files": [
+        "dist",
+        "src",
+        "README.md",
+        "LICENSE"
+    ],
+    "main": "./dist/core/index.js",
+    "module": "./dist/core/index.js",
+    "types": "./dist/types/core/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/types/core/index.d.ts",
+            "import": "./dist/core/index.js",
+            "default": "./dist/core/index.js"
+        },
+        "./ui": {
+            "types": "./dist/types/ui/index.d.ts",
+            "import": "./dist/ui/index.js",
+            "default": "./dist/ui/index.js"
+        },
+        "./standalone": {
+            "types": "./dist/types/ui/standalone.d.ts",
+            "import": "./dist/ui/standalone.js",
+            "default": "./dist/ui/standalone.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "unpkg": "./dist/ui/standalone.global.js",
+    "jsdelivr": "./dist/ui/standalone.global.js",
+    "scripts": {
+        "build": "bun scripts/build.ts",
+        "prepack": "bun run build",
+        "test": "bun test",
+        "typecheck": "tsc --noEmit -p .",
+        "smoke": "bun scripts/smoke.ts"
+    },
+    "devDependencies": {
+        "@types/bun": "^1.4.3",
+        "typescript": "^5.9.3"
+    }
+}
