@@ -288,6 +288,7 @@ export class GerolaminoConnectElement extends HTMLElement {
                 } catch {
                     this.session = null;
                 }
+                if (generation !== this.generation) return;
             }
             if (this.session && this.session.closed === false) await this.refreshStatus();
             this.render();
