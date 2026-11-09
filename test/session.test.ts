@@ -113,7 +113,7 @@ describe("session", () => {
         expect(caps.canNetworkId).toBe(true);
         expect(caps.supportsRevoke).toBe(false);
         expect(caps.revokeMethod).toBe(null);
-        expect(caps.connectorVersion).toBe("0.4.0");
+        expect(caps.connectorVersion).toBe("0.4.1");
         expect(caps.apiVersion).toBe("1");
         expect(caps.needsReload).toBe(false);
         expect(session.getCapabilities()).toEqual(caps);
@@ -149,30 +149,67 @@ describe("session", () => {
     test("status carries the identity block", async () => {
         const session = createGerolaminoSession(api(), extension({ build: "2026.11.9-abc" }));
         const status = await session.status();
-        expect(status?.identity.connectorVersion).toBe("0.4.0");
+        expect(status?.identity.connectorVersion).toBe("0.4.1");
         expect(status?.identity.apiVersion).toBe("1");
         expect(status?.identity.dappApiVersion).toBe("0.1.0");
         expect(status?.identity.build).toBe("2026.11.9-abc");
         expect(status?.identity.networkId).toBe(0);
     });
 
-    test("assertNetwork compares magic and reports the mismatch", async () => {
-        const preview = createGerolaminoSession(api({ getNetworkId: async () => 2 }), extension());
+    test("assertNetwork compares the CIP-30 id and the reported network name without conflating them", async () => {
+        // A real extension answers CIP-30: 0 on every testnet, 1 on mainnet. Never a magic.
+        const preview = createGerolaminoSession(api({ getNetworkId: async () => 0 }), extension());
+
         const ok = await preview.assertNetwork("preview");
         expect(ok.ok).toBe(true);
         expect(ok.expected).toEqual({ name: "preview", magic: 2 });
-        expect(ok.actual.magic).toBe(2);
+        expect(ok.actual.name).toBe("preview");
+        expect(ok.actual.networkId).toBe(0);
+        expect(ok.actual.magic).toBe(2);          // derived from the name, not from networkId
 
-        const wrong = await preview.assertNetwork("preprod");
-        expect(wrong.ok).toBe(false);
-        expect(wrong.detail).toContain("expects preprod");
+        expect((await preview.assertNetwork("preprod")).ok).toBe(false);
+        expect((await preview.assertNetwork("mainnet")).ok).toBe(false);
+        expect((await preview.assertNetwork(2)).ok).toBe(true);
 
-        const byMagic = await preview.assertNetwork(2);
-        expect(byMagic.ok).toBe(true);
+        const preprod = createGerolaminoSession(api({
+            getNetworkId: async () => 0,
+            getTip: async () => ({ slot: 1, height: 1, hash: "h", network: "preprod", state: "at-tip" })
+        }), extension());
+        const onPreprod = await preprod.assertNetwork("preprod");
+        expect(onPreprod.ok).toBe(true);
+        expect(onPreprod.actual.networkId).toBe(0);
+        expect(onPreprod.actual.magic).toBe(1);
+        expect((await preprod.assertNetwork("preview")).ok).toBe(false);
+        expect((await preprod.assertNetwork("preprod")).detail).toContain("preprod");
+    });
+
+    test("assertNetwork refuses to map a CIP-30 testnet id onto a magic", async () => {
+        const idOnly = createGerolaminoSession(api({
+            getNetworkId: async () => 0,
+            getTip: async () => { throw new Error("no tip"); }
+        }), extension());
+        const result = await idOnly.assertNetwork("preprod");
+        expect(result.ok).toBe(false);
+        expect(result.actual.magic).toBe(null);
+        expect(result.actual.networkId).toBe(0);
+        expect(result.detail).toContain("cannot distinguish preprod from preview");
+
+        const mainnetIdOnly = await idOnly.assertNetwork("mainnet");
+        expect(mainnetIdOnly.ok).toBe(false);
+    });
+
+    test("assertNetwork reports a contradiction instead of picking a side", async () => {
+        const contradictory = createGerolaminoSession(api({
+            getNetworkId: async () => 1,
+            getTip: async () => ({ slot: 1, height: 1, hash: "h", network: "preview", state: "at-tip" })
+        }), extension());
+        const result = await contradictory.assertNetwork("mainnet");
+        expect(result.ok).toBe(false);
+        expect(result.detail).toContain("refusing to guess");
     });
 
     test("assertNetwork refuses to guess an unknown expectation", async () => {
-        const session = createGerolaminoSession(api({ getNetworkId: async () => 2 }), extension());
+        const session = createGerolaminoSession(api({ getNetworkId: async () => 0 }), extension());
         const unknown = await session.assertNetwork("testnet-42x");
         expect(unknown.ok).toBe(false);
         expect(unknown.detail).toContain("unknown expected network");

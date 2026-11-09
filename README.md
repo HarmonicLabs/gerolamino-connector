@@ -60,8 +60,11 @@ if (answer.status === 200) console.log(answer.body, answer.source);
 - `getNetworkId()`, `getTip()`, `getTrust()`, `status()`, `query()`, `submitTx()`, `submitTxId()`.
 - `capabilities` / `getCapabilities()`: what the enabled api can actually do, plus `needsReload` and
   `submitProvenance`. Branch on these instead of comparing `apiVersion` strings.
-- `assertNetwork("preview")`: `{ ok, expected, actual, detail }`, compared on network magic
-  (`mainnet 764824073`, `preprod 1`, `preview 2`). It reports; it never throws or guesses.
+- `assertNetwork("preview")`: `{ ok, expected, actual, detail }`. It compares the node's **reported network
+  name** first and only derives a magic from that name; a CIP-30 `networkId` (0 testnet / 1 mainnet) is a
+  different identifier and is never compared against a magic. With a name it is exact; with only a CIP-30 id
+  it answers `ok: false` and says preprod/preview cannot be split rather than guessing. Contradictions
+  (name says preview, id says mainnet) are reported, not resolved. It never throws.
 - `close()`: uses a future extension revoke/disable method when present; otherwise reports a local-only
   close. The current extension exposes no page-callable revoke. The user can revoke this site in
   Gerolamino Settings -> Connected sites.
@@ -117,6 +120,14 @@ Full set: `addressUtxos`, `addressTransactions`, `addressTotal`, `asset`, `asset
 default (a fresh address is not an error); pass `{ onMissing: "throw" }` when absence is a fault. Any other
 non-200, including 500, always throws. Validators are exported: `assertAddress`, `assertTxHash`,
 `assertScriptHash`, `assertAssetUnit`.
+
+### History window (relay snapshots)
+
+A relay bootstrapped from a Mithril snapshot answers from the snapshot's ledger state, and its transaction
+index may not cover pre-snapshot history yet. So `tx(hash)` -> `null` can mean "not in this relay's index",
+not only "never happened". For recent activity and chained-withdraw polling this is fine; for historical
+lookups treat `null` as unproven and fall back to an explorer index. `provider.get()` gives you
+`status` + `requestId` when you need to log which case it was.
 
 ## Ex-units note
 

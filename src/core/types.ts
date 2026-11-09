@@ -57,11 +57,25 @@ export interface GerolaminoCapabilities {
     build: string | null;
 }
 
-/** Result of `assertNetwork()`. It reports, it never throws a mismatch. */
+/**
+ * Result of `assertNetwork()`. It reports, it never throws a mismatch.
+ *
+ * Two different identifiers, deliberately kept apart: CIP-30 `getNetworkId()` is an ID (0 = testnet,
+ * 1 = mainnet), while Cardano network magic is a different domain (preprod 1, preview 2, mainnet
+ * 764824073). A CIP-30 id is never compared against a magic, and `magic` is only filled when the node
+ * reported a network name we can map.
+ */
 export interface GerolaminoNetworkAssertion {
     ok: boolean;
     expected: { name: string | null; magic: number | null };
-    actual: { name: string | null; magic: number | null; networkId: number | null; tipNetwork: string | null };
+    actual: {
+        name: string | null;
+        /** Derived from a reported network name only, never from a CIP-30 id. */
+        magic: number | null;
+        /** CIP-30 network id: 0 testnet, 1 mainnet. Not a network magic. */
+        networkId: number | null;
+        tipNetwork: string | null;
+    };
     detail: string;
 }
 

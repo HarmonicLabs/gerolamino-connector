@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.1
+
+Bug fix reported by Gravity against 0.3.0: `assertNetwork()` compared a CIP-30 **network id** against a
+Cardano **network magic**, so `assertNetwork("preprod")` (magic 1) failed against a correct preprod node that
+answers `getNetworkId() === 0`.
+
+### Fixed
+
+- `assertNetwork()` now keeps the two identifier domains apart:
+  - the node's reported network name (`getTip().network`) is authoritative and compared by name;
+  - `magic` is only derived from that name, never from a CIP-30 id;
+  - a CIP-30 id alone is enough to prove **mainnet** (`1`), and is reported as unverified for a testnet
+    request (`0` cannot split preprod from preview) instead of returning a wrong `ok: false` reason;
+  - a contradiction between the name and the id returns `ok: false` with "refusing to guess…".
+- Regression tests model the real extension (`getNetworkId()` 0/1) instead of a magic; the previous tests
+  encoded the wrong assumption and are replaced.
+
 ## 0.4.0
 
 Item 4 (styleable element) from the Mandala review: the element no longer forces its aesthetics, and it is

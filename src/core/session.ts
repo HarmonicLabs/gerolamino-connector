@@ -152,36 +152,52 @@ export function createGerolaminoSession(
         },
         assertNetwork: async (expected: GerolaminoNetworkExpectation, opts?: { timeoutMs?: number }): Promise<GerolaminoNetworkAssertion> => {
             const want = normalizeNetwork(expected);
-            let actualNetworkId: number | null = null;
+            let cip30Id: number | null = null;
             try {
-                actualNetworkId = await networkId(opts);
+                cip30Id = await networkId(opts);
             } catch {
                 /* report what we have */
             }
-            let tipNetwork: string | null = null;
+            let tipNetworkRaw: string | null = null;
             try {
                 const tip = await session.getTip(opts);
-                tipNetwork = tip?.network == null ? null : normalizeNetwork(String(tip.network)).name ?? String(tip.network);
+                tipNetworkRaw = tip?.network == null ? null : String(tip.network);
             } catch {
                 /* report what we have */
             }
-            const actualFromMagic = actualNetworkId == null ? { name: null, magic: null } : normalizeNetwork(actualNetworkId);
-            const actualName = tipNetwork ?? (actualFromMagic.name as string | null);
-            const actualMagic = actualFromMagic.magic;
+            const tipNamed = tipNetworkRaw == null ? null : normalizeNetwork(tipNetworkRaw).name ?? tipNetworkRaw.toLowerCase();
+            // CIP-30 networkId is an ID (0 testnet / 1 mainnet), not a magic. Keep the two domains apart.
+            const cip30Kind = cip30Id === 1 ? "mainnet" : cip30Id === 0 ? "testnet" : null;
+            const groupOf = (name: string | null) => name == null ? null : name === "mainnet" ? "mainnet" : "testnet";
+            const wantGroup = groupOf(want.name);
+            const tipGroup = groupOf(tipNamed);
+            const contradiction = tipGroup != null && cip30Kind != null && tipGroup !== cip30Kind;
+            const actualMagic = tipNamed == null ? null : normalizeNetwork(tipNamed).magic;
+
             let ok = false;
-            if (want.magic != null && actualMagic != null) ok = want.magic === actualMagic;
-            else if (want.name != null && actualName != null) ok = want.name === actualName;
-            const detail = want.name == null && want.magic == null
-                ? `unknown expected network: ${String(expected)}`
-                : actualName == null && actualMagic == null
-                    ? "the Gerolamino node did not report a network"
-                    : ok
-                        ? `Gerolamino answers for ${actualName ?? actualMagic}`
-                        : `Gerolamino answers for ${actualName ?? actualMagic} (magic ${actualMagic ?? "?"}), the dApp expects ${want.name ?? want.magic}`;
+            if (contradiction) ok = false;
+            else if (want.name != null && tipNamed != null) ok = want.name === tipNamed;
+            else if (want.magic != null && actualMagic != null) ok = want.magic === actualMagic;
+            else if (wantGroup != null && cip30Kind != null) ok = wantGroup === cip30Kind && wantGroup === "mainnet";
+
+            let detail: string;
+            if (want.name == null && want.magic == null) {
+                detail = `unknown expected network: ${String(expected)}`;
+            } else if (contradiction) {
+                detail = `Gerolamino reports network "${tipNamed}" but CIP-30 networkId ${cip30Id} (${cip30Kind}); refusing to guess which one is the node`;
+            } else if (tipNamed == null && cip30Kind == null) {
+                detail = "the Gerolamino node did not report a network";
+            } else if (ok) {
+                detail = `Gerolamino answers for ${tipNamed ?? cip30Kind}`;
+            } else if (tipNamed == null && wantGroup === "testnet") {
+                detail = `CIP-30 networkId ${cip30Id} says testnet, which cannot distinguish preprod from preview; the node reported no network name, so this is unverified rather than wrong`;
+            } else {
+                detail = `Gerolamino answers for ${tipNamed ?? `CIP-30 networkId ${cip30Id}`}, the dApp expects ${want.name ?? want.magic}`;
+            }
             return {
                 ok,
                 expected: want,
-                actual: { name: actualName, magic: actualMagic, networkId: actualNetworkId, tipNetwork },
+                actual: { name: tipNamed, magic: actualMagic, networkId: cip30Id, tipNetwork: tipNetworkRaw },
                 detail
             };
         },

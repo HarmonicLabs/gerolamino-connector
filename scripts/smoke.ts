@@ -21,7 +21,7 @@ import {
 const api: GerolaminoApi = {
     query: async (path: string) => ({ status: 200, body: { path, demo: true }, source: "local" }),
     submitTx: async (hex: string) => ({ txid: `txid-${hex.slice(0, 8)}`, source: "local" }) as any,
-    getNetworkId: async () => 2,
+    getNetworkId: async () => 0,   // CIP-30: 0 = testnet, 1 = mainnet (not a magic)
     getTip: async () => ({ slot: 126_619_300, height: 9_000, hash: "blockhash", network: "preview", state: "at-tip", peerTip: { slot: 126_619_360, height: 9_001 } }),
     getTrust: async () => ({ verdict: "verified", rows: [
         { key: "signature", label: "Block signatures", value: "verified", tone: "ok" },
@@ -54,7 +54,7 @@ const tip = await session.getTip();
 if (tip.network !== "preview" || tip.state !== "at-tip") throw new Error("tip failed");
 const status = await session.status();
 if (!status || status.verdict !== "verified" || status.syncPercent !== 100) throw new Error("status failed");
-if (status.identity.connectorVersion !== CONNECTOR_VERSION || status.identity.networkId !== 2) throw new Error("status identity failed");
+if (status.identity.connectorVersion !== CONNECTOR_VERSION || status.identity.networkId !== 0) throw new Error("status identity failed");
 
 // Submit provenance: the connector must say which path carried the transaction.
 const submitted = await session.submitTx("abcdef");
