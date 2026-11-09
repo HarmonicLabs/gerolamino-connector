@@ -11,6 +11,56 @@ export interface GerolaminoAnswer {
     peer?: string | null;
     proof?: unknown;
     ledger?: unknown;
+    /** Correlation id the connector attached to this call. Quote it in support reports. */
+    requestId?: string;
+}
+
+/** Which path actually carried a submitted transaction. */
+export type GerolaminoSubmitSource = "local" | "relay" | "unknown";
+
+/**
+ * Submit provenance. `source` says whether the local node accepted the transaction or a Gerolamo peer
+ * carried it. `unknown` means the installed extension returned only a bare txid (legacy shape), so the
+ * connector cannot claim a path.
+ */
+export interface GerolaminoSubmitResult {
+    txid: string;
+    source: GerolaminoSubmitSource;
+    /** ISO 8601 timestamp of when the connector received the answer. */
+    acceptedAt: string;
+    peer?: string | null;
+    requestId: string;
+    /** True when the extension answered with a bare string instead of an object. */
+    legacyShape: boolean;
+}
+
+/** What the connected provider can actually do. Computed from the enabled api plus the extension object. */
+export interface GerolaminoCapabilities {
+    canQuery: boolean;
+    canSubmit: boolean;
+    canTip: boolean;
+    canTrust: boolean;
+    canNetworkId: boolean;
+    supportsRevoke: boolean;
+    /** The extension method `close()` will call, or null when revoke is page-inaccessible. */
+    revokeMethod: string | null;
+    /** True when `submitTx` answers with `{ txid, source, acceptedAt }` rather than a bare string. */
+    submitProvenance: boolean;
+    connectorVersion: string;
+    apiVersion: string | null;
+    dappApiVersion: string | null;
+    /** The installed provider advertises an older contract than this connector prefers; reload the extension. */
+    needsReload: boolean;
+    /** Extension build id when the provider exposes `build` / `buildId` / `version`. */
+    build: string | null;
+}
+
+/** Result of `assertNetwork()`. It reports, it never throws a mismatch. */
+export interface GerolaminoNetworkAssertion {
+    ok: boolean;
+    expected: { name: string | null; magic: number | null };
+    actual: { name: string | null; magic: number | null; networkId: number | null; tipNetwork: string | null };
+    detail: string;
 }
 
 /** Verified tip of the Gerolamino node. */
@@ -58,6 +108,10 @@ export interface GerolaminoExtension {
     icon?: string;
     isWallet?: boolean;
     supportedExtensions?: string[];
+    /** Optional build identity some extension builds expose, for support triage. */
+    build?: string;
+    buildId?: string;
+    version?: string;
     isEnabled?(): Promise<boolean>;
     enable(): Promise<GerolaminoApi>;
     /** Optional future extension methods; the connector uses them only when present. */
@@ -85,6 +139,14 @@ export interface GerolaminoDetection {
     name: string | null;
     apiVersion: string | null;
     dappApiVersion: string | null;
+    /**
+     * True when the installed provider advertises a contract older than the connector's preferred one
+     * (legacy `0.1.0`, no version, or an unknown version). A reload/update of the extension is the fix;
+     * do not treat the version string itself as the health signal.
+     */
+    needsReload: boolean;
+    /** Extension build id when exposed. */
+    build: string | null;
     detail: string;
 }
 
@@ -101,6 +163,14 @@ export interface GerolaminoNodeStatus {
     verdict: string | null;
     trustRows: GerolaminoTrustRow[];
     tip: GerolaminoTip | null;
+    /** Support triage from a screenshot: who answered, with which contract, on which network. */
+    identity: {
+        connectorVersion: string;
+        apiVersion: string | null;
+        dappApiVersion: string | null;
+        build: string | null;
+        networkId: number | null;
+    };
 }
 
 export interface GerolaminoDisconnectResult {
@@ -131,7 +201,10 @@ export interface GerolaminoProvider {
     get(path: string, init?: { count?: number; page?: number; order?: "asc" | "desc" }): Promise<GerolaminoAnswer>;
     json<T = unknown>(path: string, init?: { count?: number; page?: number; order?: "asc" | "desc" }): Promise<T>;
     getAllPages<T = unknown>(path: string, opts?: { count?: number; maxPages?: number }): Promise<T[]>;
-    submitTx(txCborHex: string): Promise<string>;
+    /** Forwards a signed transaction and reports which path carried it. */
+    submitTx(txCborHex: string): Promise<GerolaminoSubmitResult>;
+    /** Convenience: just the txid, for callers that do not need provenance. */
+    submitTxId(txCborHex: string): Promise<string>;
 }
 
 export interface GerolaminoSession {
@@ -139,14 +212,23 @@ export interface GerolaminoSession {
     readonly extension: GerolaminoExtension;
     readonly provider: GerolaminoProvider;
     readonly closed: boolean;
+    /** What the enabled api can actually do; read once at session creation. */
+    readonly capabilities: GerolaminoCapabilities;
+    getCapabilities(): GerolaminoCapabilities;
     getNetworkId(opts?: { timeoutMs?: number }): Promise<number>;
     query(path: string, opts?: { timeoutMs?: number }): Promise<GerolaminoAnswer>;
-    submitTx(txCborHex: string, opts?: { timeoutMs?: number }): Promise<string>;
+    submitTx(txCborHex: string, opts?: { timeoutMs?: number }): Promise<GerolaminoSubmitResult>;
+    submitTxId(txCborHex: string, opts?: { timeoutMs?: number }): Promise<string>;
     getTip(opts?: { timeoutMs?: number }): Promise<GerolaminoTip>;
     getTrust(opts?: { timeoutMs?: number }): Promise<GerolaminoTrust | null>;
     status(opts?: { timeoutMs?: number }): Promise<GerolaminoNodeStatus | null>;
+    /** Compare the node's network with what the dApp expects. Reports, never throws. */
+    assertNetwork(expected: GerolaminoNetworkExpectation, opts?: { timeoutMs?: number }): Promise<GerolaminoNetworkAssertion>;
     close(opts?: { timeoutMs?: number }): Promise<GerolaminoDisconnectResult>;
 }
+
+/** `"preview" | "preprod" | "mainnet"` (case-insensitive) or a raw network magic. */
+export type GerolaminoNetworkExpectation = string | number;
 
 export interface GerolaminoResponse {
     ok: boolean;

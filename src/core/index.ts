@@ -5,25 +5,33 @@
 export type {
     GerolaminoAnswer,
     GerolaminoApi,
+    GerolaminoCapabilities,
     GerolaminoConnectOptions,
     GerolaminoDetection,
     GerolaminoDetectionStatus,
     GerolaminoDisconnectResult,
     GerolaminoExtension,
+    GerolaminoNetworkAssertion,
+    GerolaminoNetworkExpectation,
     GerolaminoNodeStatus,
     GerolaminoProvider,
     GerolaminoProviderOptions,
     GerolaminoResponse,
     GerolaminoSession,
     GerolaminoSessionOptions,
+    GerolaminoSubmitResult,
+    GerolaminoSubmitSource,
     GerolaminoTip,
     GerolaminoTrust,
     GerolaminoTrustRow,
     GerolaminoWindowLike
 } from "./types";
 
+export type { GerolaminoErrorKind, GerolaminoErrorShape, GerolaminoErrorInit } from "./errors";
+
 export {
     CONNECTOR_VERSION,
+    CARDANO_NETWORK_MAGIC,
     GEROLAMINO_API_VERSION,
     GEROLAMINO_DAPP_API_VERSION,
     DEFAULT_DETECTION_TIMEOUT_MS,
@@ -32,10 +40,13 @@ export {
     DEFAULT_SUBMIT_TIMEOUT_MS,
     currentWindow,
     extensionFromWindow,
+    extensionBuild,
     hasGerolamino,
     isGerolaminoApi,
     checkPath,
-    withQuery
+    withQuery,
+    normalizeNetwork,
+    nextRequestId
 } from "./util";
 
 export {
@@ -47,9 +58,19 @@ export {
 
 export { connectGerolamino, enableGerolamino } from "./connect";
 export { createGerolaminoSession } from "./session";
-export { createGerolaminoProvider, gerolaminoProvider, createGerolaminoFetch } from "./provider";
+export { createGerolaminoProvider, gerolaminoProvider, createGerolaminoFetch, answerError, normalizeSubmitResult } from "./provider";
+export { readCapabilities, needsReloadOf, revokeMethodOf, markSubmitProvenance, REVOKE_METHODS } from "./capabilities";
 
-export { GerolaminoError, GerolaminoNotInstalledError, GerolaminoIncompatibleError, GerolaminoTimeoutError, GerolaminoHttpError } from "./errors";
+export {
+    GerolaminoError,
+    GerolaminoNotInstalledError,
+    GerolaminoIncompatibleError,
+    GerolaminoTimeoutError,
+    GerolaminoHttpError,
+    GerolaminoGatewaySilentError,
+    GerolaminoNetworkMismatchError,
+    errorFromUnknown
+} from "./errors";
 
 import type { GerolaminoSession } from "./types";
 import type { GerolaminoNodeStatus } from "./types";

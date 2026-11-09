@@ -1,13 +1,80 @@
 import { GerolaminoError, GerolaminoTimeoutError } from "./errors";
 import type { GerolaminoApi, GerolaminoExtension, GerolaminoProviderOptions, GerolaminoWindowLike } from "./types";
 
-export const CONNECTOR_VERSION = "0.1.0";
+export const CONNECTOR_VERSION = "0.2.0";
 export const GEROLAMINO_API_VERSION = "1";
 export const GEROLAMINO_DAPP_API_VERSION = "0.1.0";
 export const DEFAULT_DETECTION_TIMEOUT_MS = 5_000;
 export const DEFAULT_APPROVAL_TIMEOUT_MS = 15_000;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 export const DEFAULT_SUBMIT_TIMEOUT_MS = 90_000;
+
+/** Cardano network magic values. Compare these, never the display string alone. */
+export const CARDANO_NETWORK_MAGIC = {
+    mainnet: 764824073,
+    preprod: 1,
+    preview: 2
+} as const;
+
+export type GerolaminoNetworkName = keyof typeof CARDANO_NETWORK_MAGIC;
+
+const NETWORK_ALIASES: Record<string, GerolaminoNetworkName> = {
+    main: "mainnet",
+    mainnet: "mainnet",
+    preprod: "preprod",
+    preproduction: "preprod",
+    testnet: "preprod",
+    preview: "preview"
+};
+
+/** Map a network name, alias or raw magic to `{ name, magic }`. Unknown input yields nulls, never a guess. */
+export function normalizeNetwork(expected: string | number | null | undefined): { name: string | null; magic: number | null } {
+    if (expected == null) return { name: null, magic: null };
+    if (typeof expected === "number") {
+        for (const [name, magic] of Object.entries(CARDANO_NETWORK_MAGIC)) {
+            if (magic === expected) return { name, magic };
+        }
+        return { name: null, magic: Number.isFinite(expected) ? expected : null };
+    }
+    const key = String(expected).trim().toLowerCase().replace(/[\s_-]+/g, "");
+    const named = NETWORK_ALIASES[key] ?? NETWORK_ALIASES[String(expected).trim().toLowerCase()];
+    if (named) return { name: named, magic: CARDANO_NETWORK_MAGIC[named] };
+    const asNumber = Number(key);
+    if (Number.isFinite(asNumber) && key !== "") return normalizeNetwork(asNumber);
+    return { name: null, magic: null };
+}
+
+let requestCounter = 0;
+
+/** Short correlation id attached to every transport call and error. Not a server-side trace id. */
+export function nextRequestId(prefix = "grl"): string {
+    requestCounter = (requestCounter + 1) % 0x100000;
+    return `${prefix}-${Date.now().toString(36)}-${requestCounter.toString(36)}`;
+}
+
+export function nowIso(): string {
+    return new Date().toISOString();
+}
+
+/** An `apiVersion` equal to the pre-1.0 dapp API version. Accepted, but the extension should be reloaded. */
+export function isLegacyVersion(apiVersion: string): boolean {
+    return apiVersion === GEROLAMINO_DAPP_API_VERSION;
+}
+
+/** Reload/update is the fix when the provider is unusable, or usable but on the legacy contract. */
+export function needsReloadFor(state: { compatible: boolean; legacyVersion: boolean }): boolean {
+    return !state.compatible || state.legacyVersion;
+}
+
+/** First build identity an extension build chose to expose. */
+export function extensionBuild(ext: GerolaminoExtension | null | undefined): string | null {
+    if (!ext) return null;
+    for (const key of ["build", "buildId", "version"] as const) {
+        const value = (ext as any)[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return null;
+}
 
 const isPromiseLike = (value: unknown): value is PromiseLike<unknown> =>
     !!value && typeof (value as any).then === "function";

@@ -21,7 +21,7 @@ The connector targets the Gerolamino extension's CIP-30-shaped initial API:
 | `isEnabled()` | non-prompting approval probe |
 | `enable()` | one approval window per site; returns the api |
 | `query(path)` | Blockfrost GET with `{ status, body, source, peer, proof, ledger }` |
-| `submitTx(hex)` | forwards a signed transaction and returns its id |
+| `submitTx(hex)` | forwards a signed transaction; answers `{ txid, source, acceptedAt, peer?, requestId, legacyShape }` |
 | `getTip()` | newest verified block (`slot, height, hash, network, state, peerTip`) |
 | `getTrust()` | Trust card verdict and rows |
 
@@ -57,13 +57,47 @@ if (answer.status === 200) console.log(answer.body, answer.source);
 
 - `api`: the enabled extension api.
 - `provider`: Blockfrost transport (`get`, `json`, `getAllPages`, `submitTx`).
-- `getNetworkId()`, `getTip()`, `getTrust()`, `status()`, `query()`, `submitTx()`.
+- `getNetworkId()`, `getTip()`, `getTrust()`, `status()`, `query()`, `submitTx()`, `submitTxId()`.
+- `capabilities` / `getCapabilities()`: what the enabled api can actually do, plus `needsReload` and
+  `submitProvenance`. Branch on these instead of comparing `apiVersion` strings.
+- `assertNetwork("preview")`: `{ ok, expected, actual, detail }`, compared on network magic
+  (`mainnet 764824073`, `preprod 1`, `preview 2`). It reports; it never throws or guesses.
 - `close()`: uses a future extension revoke/disable method when present; otherwise reports a local-only
   close. The current extension exposes no page-callable revoke. The user can revoke this site in
   Gerolamino Settings -> Connected sites.
 
 The connector keeps response provenance fields out of the body, exactly as `query()` returns them:
-`source: "local" | "relay"`, `peer`, `proof`, and `ledger`.
+`source: "local" | "relay"`, `peer`, `proof`, and `ledger`. `status().identity` carries the connector
+version, the extension's `apiVersion`/build id, and the network id, so a screenshot is enough to triage.
+
+## Submit provenance
+
+`submitTx()` says which path carried the transaction instead of leaving you to infer it:
+
+```ts
+const submitted = await session.submitTx(signedCborHex);
+// { txid, source: "local" | "relay" | "unknown", acceptedAt, peer, requestId, legacyShape }
+if (submitted.legacyShape) console.warn("extension returned a bare txid: reload to get provenance");
+```
+
+`source: "unknown"` is honest: the installed extension answered with a bare string. `submitTxId()` is the
+same call without provenance.
+
+## Errors
+
+Every failure is a `GerolaminoError` with `kind`, `status`, `path`, `blockfrostBody`, and `requestId`, and
+`JSON.stringify(error)` yields the whole shape. Switch on `kind`:
+
+```ts
+catch (e) {
+    const err = e as GerolaminoError;
+    if (err.kind === "GATEWAY_SILENT") backOff();   // approved, node answering nothing
+    console.error(JSON.stringify(err));
+}
+```
+
+`GATEWAY_SILENT` is the official code for "connected but the node is not answering"; do not invent a
+private 503 semantic. The full table is in [`docs/ERRORS.md`](./docs/ERRORS.md).
 
 ## Browser element
 
@@ -120,11 +154,13 @@ The demo is `examples/connect-demo.html`. Open it with `?stub` to exercise the U
 
 ## Contract notes
 
-- Detection is prompt-free: presence plus `isEnabled()` only.
+- Detection is prompt-free: presence, `needsReload`, and `isEnabled()` only.
 - Approval happens only through the explicit `connect()`/Connect button.
 - The extension takes the site origin from the browser, never from the page.
 - The current extension rate limit is 60 calls per 10 seconds per site.
-- `apiVersion` drift: current `"1"`, legacy `"0.1.0"`; the connector accepts both by default.
+- `apiVersion` drift is reported, not hidden: current `"1"`, legacy `"0.1.0"` is accepted and flags
+  `needsReload`; incompatible versions are `status: "incompatible"` with `needsReload: true`.
+- The connector's own version is `CONNECTOR_VERSION`; the package version is the release contract.
 - `getTrust()` is optional; `status()` returns null when the node has no verified tip.
 - No wallet methods, no CIP-8 signing, no keys.
 

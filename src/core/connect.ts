@@ -28,7 +28,7 @@ export async function connectGerolamino(options: GerolaminoConnectOptions & Gero
         throw errorFromUnknown(e, "Gerolamino enable() failed");
     }
     if (!isGerolaminoApi(api)) throw new GerolaminoIncompatibleError("Gerolamino enable() did not return an api with query() and submitTx()");
-    return createGerolaminoSession(api, extension, options);
+    return createGerolaminoSession(api, extension, options, detection);
 }
 
 /** Low-level compatibility helper for callers that already checked presence. */

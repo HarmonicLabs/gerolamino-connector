@@ -78,4 +78,78 @@ describe("session", () => {
         const session = createGerolaminoSession(api(), extension());
         await expect(session.provider.submitTx("0xzz")).rejects.toThrow(GerolaminoError);
     });
+
+    test("capabilities report what the enabled api actually exposes", async () => {
+        const session = createGerolaminoSession(api(), extension());
+        const caps = session.capabilities;
+        expect(caps.canQuery).toBe(true);
+        expect(caps.canSubmit).toBe(true);
+        expect(caps.canTrust).toBe(true);
+        expect(caps.canNetworkId).toBe(true);
+        expect(caps.supportsRevoke).toBe(false);
+        expect(caps.revokeMethod).toBe(null);
+        expect(caps.connectorVersion).toBe("0.2.0");
+        expect(caps.apiVersion).toBe("1");
+        expect(caps.needsReload).toBe(false);
+        expect(session.getCapabilities()).toEqual(caps);
+
+        const bare = createGerolaminoSession({
+            query: async () => ({ status: 200, body: [], source: "local" }),
+            submitTx: async () => "aa",
+            getTip: async () => ({ slot: 1, height: 1, hash: "h", network: "preview", state: "at-tip" })
+        } as any, extension());
+        expect(bare.capabilities.canTrust).toBe(false);
+        expect(bare.capabilities.canNetworkId).toBe(false);
+    });
+
+    test("submitTx returns provenance and flips the capability flag", async () => {
+        const session = createGerolaminoSession(api({ submitTx: async () => ({ txid: "cd".repeat(32), source: "local" }) as any }), extension());
+        expect(session.capabilities.submitProvenance).toBe(false);
+        const result = await session.submitTx("abcdef");
+        expect(result.txid).toBe("cd".repeat(32));
+        expect(result.source).toBe("local");
+        expect(result.legacyShape).toBe(false);
+        expect(session.capabilities.submitProvenance).toBe(true);
+        expect(await session.submitTxId("abcdef")).toBe("cd".repeat(32));
+    });
+
+    test("legacy string submits stay unproven and uncontracted", async () => {
+        const session = createGerolaminoSession(api(), extension());
+        const result = await session.submitTx("abcdef");
+        expect(result.legacyShape).toBe(true);
+        expect(result.source).toBe("unknown");
+        expect(session.capabilities.submitProvenance).toBe(false);
+    });
+
+    test("status carries the identity block", async () => {
+        const session = createGerolaminoSession(api(), extension({ build: "2026.11.9-abc" }));
+        const status = await session.status();
+        expect(status?.identity.connectorVersion).toBe("0.2.0");
+        expect(status?.identity.apiVersion).toBe("1");
+        expect(status?.identity.dappApiVersion).toBe("0.1.0");
+        expect(status?.identity.build).toBe("2026.11.9-abc");
+        expect(status?.identity.networkId).toBe(0);
+    });
+
+    test("assertNetwork compares magic and reports the mismatch", async () => {
+        const preview = createGerolaminoSession(api({ getNetworkId: async () => 2 }), extension());
+        const ok = await preview.assertNetwork("preview");
+        expect(ok.ok).toBe(true);
+        expect(ok.expected).toEqual({ name: "preview", magic: 2 });
+        expect(ok.actual.magic).toBe(2);
+
+        const wrong = await preview.assertNetwork("preprod");
+        expect(wrong.ok).toBe(false);
+        expect(wrong.detail).toContain("expects preprod");
+
+        const byMagic = await preview.assertNetwork(2);
+        expect(byMagic.ok).toBe(true);
+    });
+
+    test("assertNetwork refuses to guess an unknown expectation", async () => {
+        const session = createGerolaminoSession(api({ getNetworkId: async () => 2 }), extension());
+        const unknown = await session.assertNetwork("testnet-42x");
+        expect(unknown.ok).toBe(false);
+        expect(unknown.detail).toContain("unknown expected network");
+    });
 });

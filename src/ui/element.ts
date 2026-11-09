@@ -364,6 +364,8 @@ export class GerolaminoConnectElement extends HTMLElement {
             row("enabled", this.session ? "yes" : this.detection.enabled === null ? "unknown" : this.detection.enabled ? "yes" : "no");
             if (this.detection.apiVersion) row("api", this.detection.apiVersion);
             if (this.detection.dappApiVersion) row("dapp api", this.detection.dappApiVersion);
+            if (this.detection.build) row("build", this.detection.build);
+            if (this.detection.needsReload) row("reload", "extension is on the legacy contract");
             row("network", this.status?.network ?? (this.detection.enabled ? "awaiting status" : "awaiting enable"));
             row("state", this.status?.state ?? (this.session ? "awaiting status" : "not connected"));
             row("tip", this.status?.tipSlot != null ? String(this.status.tipSlot) : "—");

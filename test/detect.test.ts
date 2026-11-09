@@ -81,8 +81,18 @@ describe("detection", () => {
         const legacy = await detectGerolamino({ win: win(extension), allowLegacyApiVersion: true });
         expect(legacy.status).toBe("present");
         expect(legacy.legacyVersion).toBe(true);
+        expect(legacy.needsReload).toBe(true);
+        expect(legacy.detail).toContain("reload");
         const strict = await detectGerolamino({ win: win(extension), allowLegacyApiVersion: false });
         expect(strict.status).toBe("incompatible");
+        expect(strict.needsReload).toBe(true);
+    });
+
+    test("current contract does not ask for a reload and passes the build id through", async () => {
+        const detection = await detectGerolamino({ win: win(fakeExtension({ build: "2026.11.9-abc" })) });
+        expect(detection.status).toBe("present");
+        expect(detection.needsReload).toBe(false);
+        expect(detection.build).toBe("2026.11.9-abc");
     });
 
     test("sync compatibility helper reads presence only", () => {
