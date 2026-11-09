@@ -52,24 +52,40 @@ export class GerolaminoConnectElement extends HTMLElement {
         const style = document.createElement("style");
         style.textContent = `
             :host {
-                --gc-accent: #ff2d55;
-                --gc-ok: #00e676;
-                --gc-warn: #ffb300;
-                --gc-bad: #ff5a5f;
-                --gc-panel: #141821;
-                --gc-text: #e8eaf0;
-                --gc-dim: #8a93a6;
-                --gc-border: #232a36;
+                /* Public surface: set these from the page. The --gc-* names are the legacy aliases. */
+                --gerolamino-accent: #ff2d55;
+                --gerolamino-ok: #00e676;
+                --gerolamino-warn: #ffb300;
+                --gerolamino-bad: #ff5a5f;
+                --gerolamino-panel: #141821;
+                --gerolamino-text: #e8eaf0;
+                --gerolamino-muted: #8a93a6;
+                --gerolamino-border: #232a36;
+                --gerolamino-radius: 8px;
+                --gerolamino-font: 12px/1.4 system-ui, sans-serif;
+                --gc-accent: var(--gerolamino-accent);
+                --gc-ok: var(--gerolamino-ok);
+                --gc-warn: var(--gerolamino-warn);
+                --gc-bad: var(--gerolamino-bad);
+                --gc-panel: var(--gerolamino-panel);
+                --gc-text: var(--gerolamino-text);
+                --gc-dim: var(--gerolamino-muted);
+                --gc-border: var(--gerolamino-border);
+                --gc-radius: var(--gerolamino-radius);
                 display: inline-block;
                 position: relative;
-                font: 12px/1.4 system-ui, sans-serif;
+                font: var(--gerolamino-font);
                 color: var(--gc-text);
             }
             .root { position: relative; }
+            .sr {
+                position: absolute; width: 1px; height: 1px; overflow: hidden;
+                clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+            }
             .trigger {
                 display: inline-flex; align-items: center; gap: 7px;
                 height: 34px; padding: 0 10px;
-                border: 1px solid var(--gc-border); border-radius: 8px;
+                border: 1px solid var(--gc-border); border-radius: var(--gc-radius);
                 background: var(--gc-panel); color: var(--gc-text);
                 cursor: pointer; user-select: none; font: inherit;
             }
@@ -85,7 +101,7 @@ export class GerolaminoConnectElement extends HTMLElement {
                 position: absolute; right: 0; top: 40px; z-index: 2147483000;
                 width: 330px; padding: 12px;
                 background: var(--gc-panel); color: var(--gc-text);
-                border: 1px solid var(--gc-border); border-radius: 10px;
+                border: 1px solid var(--gc-border); border-radius: calc(var(--gc-radius) + 2px);
                 box-shadow: 0 12px 40px rgba(0,0,0,.5);
             }
             .panel[hidden] { display: none; }
@@ -96,7 +112,7 @@ export class GerolaminoConnectElement extends HTMLElement {
             .notice { color: var(--gc-dim); margin-top: 8px; overflow-wrap: anywhere; }
             .actions { display: flex; gap: 7px; margin-top: 9px; }
             .actions button {
-                border: 1px solid var(--gc-border); border-radius: 6px;
+                border: 1px solid var(--gc-border); border-radius: var(--gc-radius);
                 padding: 6px 10px; background: var(--gc-panel); color: var(--gc-text);
                 cursor: pointer; font: inherit;
             }
@@ -115,41 +131,112 @@ export class GerolaminoConnectElement extends HTMLElement {
         `;
         const root = document.createElement("div");
         root.className = "root";
+        root.addEventListener("keydown", (event) => this.handleKeydown(event));
+
         const trigger = document.createElement("button");
         trigger.className = "trigger";
         trigger.type = "button";
+        trigger.id = "gc-trigger";
+        trigger.setAttribute("part", "trigger");
         trigger.setAttribute("aria-haspopup", "dialog");
         trigger.setAttribute("aria-expanded", "false");
+        trigger.setAttribute("aria-controls", "gc-panel");
         trigger.setAttribute("aria-label", "Gerolamino");
         const dot = document.createElement("span");
         dot.className = "dot";
+        dot.setAttribute("part", "dot");
         const label = document.createElement("span");
         label.className = "label";
+        label.setAttribute("part", "label");
         label.textContent = "Gerolamino";
         const caret = document.createElement("span");
         caret.className = "caret";
+        caret.setAttribute("part", "caret");
         caret.textContent = "▾";
         trigger.append(dot, label, caret);
         trigger.addEventListener("click", () => {
-            this.open = !this.open;
-            if (this.open) void this.refresh();
-            this.render();
+            if (this.open) this.closePanel();
+            else this.openPanel();
         });
+
         const panel = document.createElement("div");
         panel.className = "panel";
+        panel.id = "gc-panel";
+        panel.setAttribute("part", "panel");
         panel.setAttribute("role", "dialog");
-        panel.setAttribute("aria-label", "Gerolamino status");
+        panel.setAttribute("aria-modal", "false");
+        panel.setAttribute("aria-labelledby", "gc-title");
+        panel.tabIndex = -1;
         panel.hidden = true;
-        root.append(trigger, panel);
+
+        const live = document.createElement("div");
+        live.className = "sr";
+        live.setAttribute("part", "live");
+        live.setAttribute("role", "status");
+        live.setAttribute("aria-live", "polite");
+
+        root.append(trigger, panel, live);
         shadow.append(style, root);
         this.root = root;
         this.trigger = trigger;
         this.panel = panel;
+        this.live = live;
         this.labelNode = label;
         this.bindCore();
     }
 
     private labelNode: HTMLElement | null = null;
+    private live: HTMLElement | null = null;
+    private previouslyFocused: HTMLElement | null = null;
+
+    /** Open the panel as a dialog: remember focus, focus the first action, and let Escape return it. */
+    private openPanel(): void {
+        if (this.open) return;
+        this.previouslyFocused = (this.shadowRoot?.activeElement as HTMLElement | null) ?? null;
+        this.open = true;
+        if (this.panel) this.panel.hidden = false;
+        void this.refresh();
+        this.render();
+        queueMicrotask(() => {
+            const first = this.panel?.querySelector<HTMLElement>("button:not([disabled])");
+            (first ?? this.panel)?.focus();
+        });
+    }
+
+    private closePanel(): void {
+        if (!this.open) return;
+        this.open = false;
+        this.render();
+        const target = this.previouslyFocused ?? this.trigger;
+        target?.focus();
+        this.previouslyFocused = null;
+    }
+
+    /** Escape closes and returns focus; Tab wraps inside the panel. */
+    private handleKeydown(event: KeyboardEvent): void {
+        if (!this.open) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            this.closePanel();
+            return;
+        }
+        if (event.key !== "Tab" || !this.panel) return;
+        const focusables = Array.from(this.panel.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        ));
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = (this.shadowRoot?.activeElement as HTMLElement | null) ?? null;
+        if (event.shiftKey && (active === first || active === this.panel || active === null)) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && (active === last || active === null)) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
 
     get label(): string {
         return this.getAttribute("label") || "Gerolamino";
@@ -409,12 +496,15 @@ export class GerolaminoConnectElement extends HTMLElement {
         else this.panel.hidden = true;
         if (this.compact) this.root.classList.add("compact");
         else this.root.classList.remove("compact");
+        if (this.live) this.live.textContent = `${label}. ${this.detail() || ""}`.trim();
     }
 
     private renderPanel(): void {
         if (!this.panel) return;
         const header = document.createElement("div");
         header.className = "title";
+        header.id = "gc-title";
+        header.setAttribute("part", "title");
         header.textContent = this.detection?.status === "absent"
             ? "Gerolamino is not installed"
             : this.detection?.status === "incompatible"
@@ -441,9 +531,11 @@ export class GerolaminoConnectElement extends HTMLElement {
             const row = (key: string, value: string) => {
                 const k = document.createElement("span");
                 k.className = "k";
+                k.setAttribute("part", "row-key");
                 k.textContent = key;
                 const v = document.createElement("span");
                 v.className = "v";
+                v.setAttribute("part", "row-value");
                 v.textContent = value;
                 grid.append(k, v);
             };
@@ -464,6 +556,7 @@ export class GerolaminoConnectElement extends HTMLElement {
             if (this.status?.trustRows?.length) {
                 const trust = document.createElement("div");
                 trust.className = "trust";
+                trust.setAttribute("part", "trust");
                 trust.textContent = this.status.trustRows.map((r) => `${r.label ?? r.key ?? ""}=${r.value ?? ""}${r.tone ? ` (${r.tone})` : ""}`).join(" · ");
                 body.append(trust);
             }
@@ -476,6 +569,7 @@ export class GerolaminoConnectElement extends HTMLElement {
             const connect = document.createElement("button");
             connect.type = "button";
             connect.className = "connect";
+            connect.setAttribute("part", "button connect");
             connect.textContent = foreign ? "approval open in another tab" : this.busy ? "connecting..." : "Connect Gerolamino";
             connect.disabled = this.busy || foreign;
             connect.title = foreign
@@ -488,6 +582,7 @@ export class GerolaminoConnectElement extends HTMLElement {
             const action = disconnectAction(this.session.capabilities);
             const disconnect = document.createElement("button");
             disconnect.type = "button";
+            disconnect.setAttribute("part", "button disconnect");
             disconnect.textContent = this.busy ? "..." : action.label;
             disconnect.title = action.mode === "local"
                 ? "This build exposes no page-callable revoke: the connector stops here, the site stays approved"
@@ -501,19 +596,20 @@ export class GerolaminoConnectElement extends HTMLElement {
         if (this.notice || this.detail()) {
             const note = document.createElement("div");
             note.className = "notice";
+            note.setAttribute("part", "notice");
             note.textContent = this.notice || this.detail() || "";
             body.append(note);
         }
 
         const footer = document.createElement("div");
         footer.className = "footer";
+        footer.setAttribute("part", "footer");
         const close = document.createElement("button");
         close.type = "button";
+        close.setAttribute("part", "button close");
+        close.setAttribute("aria-label", "Close Gerolamino panel");
         close.textContent = "close ✕";
-        close.addEventListener("click", () => {
-            this.open = false;
-            this.render();
-        });
+        close.addEventListener("click", () => this.closePanel());
         footer.append(close);
 
         this.panel.replaceChildren(header, body, footer);

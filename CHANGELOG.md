@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.4.0
+
+Item 4 (styleable element) from the Mandala review: the element no longer forces its aesthetics, and it is
+usable by keyboard and screen reader. No core API change.
+
+### Added
+
+- Theme custom properties: `--gerolamino-accent`, `-panel`, `-text`, `-muted`, `-border`, `-ok`, `-warn`,
+  `-bad`, `-radius`, `-font`. The `--gc-*` names remain as aliases that default to them, so existing
+  overrides still apply.
+- `::part()` hooks: `trigger`, `dot`, `label`, `caret`, `panel`, `title`, `row-key`, `row-value`, `trust`,
+  `notice`, `button`, `connect`, `disconnect`, `close`, `footer`, `live`.
+- Dialog semantics: `role="dialog"`, `aria-modal="false"`, `aria-labelledby` -> panel title, trigger
+  `aria-haspopup`/`aria-expanded`/`aria-controls`, panel `tabindex="-1"`.
+- Keyboard: opening focuses the first action, `Tab`/`Shift+Tab` wrap inside the panel, `Escape` closes and
+  restores focus to the trigger.
+- `role="status"` `aria-live="polite"` region announcing the current label and detail.
+
+### Testing
+
+- `happy-dom` as a **devDependency only** (the published package still has no runtime dependency); 7 new
+  element tests cover parts, dialog wiring, the live region, the theme block, open/close focus return and
+  the Tab wrap.
+
 ## 0.3.0
 
 Item 6 (typed helpers) from the Mandala review, plus the evaluate question Gravity raised. No breaking change

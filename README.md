@@ -170,9 +170,40 @@ Include the standalone build once, then use the element in any framework or plai
 
 `poll` is the detection refresh interval in seconds; `poll="0"` disables polling. `label`, `compact`, and
 `hide-when-absent` are optional presentation attributes. The element dispatches `gerolamino:connected`,
-`gerolamino:status`, `gerolamino:disconnected`, and `gerolamino:error` custom events. It uses a shadow DOM
-and accepts `--gc-accent`, `--gc-ok`, `--gc-warn`, `--gc-bad`, `--gc-panel`, `--gc-text`, `--gc-dim`, and
-`--gc-border` style variables.
+`gerolamino:status`, `gerolamino:disconnected`, and `gerolamino:error` custom events.
+
+### Theming
+
+The element no longer forces its own look. Set these custom properties on the element (or any ancestor):
+
+| Property | Purpose |
+|---|---|
+| `--gerolamino-accent` | accent/primary colour |
+| `--gerolamino-panel` | panel background |
+| `--gerolamino-text` | foreground text |
+| `--gerolamino-muted` | secondary text, caret, notices |
+| `--gerolamino-border` | borders |
+| `--gerolamino-ok` / `-warn` / `-bad` | status tones |
+| `--gerolamino-radius` | corner radius (px value, e.g. `12px`) |
+| `--gerolamino-font` | `font` shorthand for the whole element |
+
+The legacy `--gc-*` names still work and now default to the `--gerolamino-*` values, so existing overrides
+keep applying. For structural changes the element exposes `::part()` hooks:
+
+`trigger`, `dot`, `label`, `caret`, `panel`, `title`, `row-key`, `row-value`, `trust`, `notice`,
+`button`, `connect`, `disconnect`, `close`, `footer`, `live`.
+
+```css
+gerolamino-connect::part(panel) { width: 380px; }
+gerolamino-connect::part(button) { font-weight: 600; }
+```
+
+### Accessibility
+
+The panel is a `role="dialog"` labelled by its title: opening it focuses the first action, `Tab` wraps
+inside the panel, `Escape` closes it and returns focus to the trigger, and a polite `role="status"` live
+region announces status changes. The trigger carries `aria-haspopup`, `aria-expanded`, and
+`aria-controls`. There is no focus-trap escape hatch by design: a second click on the trigger always closes.
 
 For framework wrappers, use the ESM UI entry:
 
