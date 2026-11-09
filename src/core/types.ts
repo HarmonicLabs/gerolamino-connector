@@ -175,8 +175,22 @@ export interface GerolaminoNodeStatus {
 
 export interface GerolaminoDisconnectResult {
     mode: "extension" | "local";
+    /** True only when the approval was revoked through the extension. A local close is NOT a revoke. */
+    revoked: boolean;
+    /** False when the extension method resolved without saying it revoked (a silent no-op is not proof). */
+    verified: boolean;
+    /** What the extension answered, when it answered with something meaningful. */
+    api?: string;
     method: string | null;
     message: string;
+}
+
+/** How to label the disconnect control before it is pressed. Never "Disconnect" when it cannot revoke. */
+export interface GerolaminoDisconnectAction {
+    mode: "extension" | "local";
+    /** `"Revoke approval"` when a page-callable revoke exists, else `"Stop using Gerolamino on this site"`. */
+    label: string;
+    revokeMethod: string | null;
 }
 
 export interface GerolaminoConnectOptions {

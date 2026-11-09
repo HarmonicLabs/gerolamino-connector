@@ -99,6 +99,40 @@ catch (e) {
 `GATEWAY_SILENT` is the official code for "connected but the node is not answering"; do not invent a
 private 503 semantic. The full table is in [`docs/ERRORS.md`](./docs/ERRORS.md).
 
+## Disconnect is honest
+
+Gerolamino exposes no page-callable revoke today, so "Disconnect" would be a lie. The session reports
+what actually happened instead of a boolean you have to guess:
+
+```ts
+const result = await session.close();
+// { mode: "extension" | "local", revoked: boolean, verified: boolean, api?: string, method, message }
+```
+
+- `revoked: true` only when an extension revoke/disable method ran.
+- `verified: false` when that method resolved without confirming (the silent no-op case): the message says
+  the site may still be approved.
+- `mode: "local"` means nothing was revoked: the connector is off for this page only, the site stays
+  approved. The message points at Gerolamino Settings -> Connected sites.
+
+`disconnectAction(session.capabilities)` gives the control its label: `"Revoke approval"` when a revoke
+exists, `"Stop using Gerolamino on this site"` when it does not. The element uses it.
+
+## Cross-tab behaviour
+
+Several tabs of the same origin used to poll independently and could each open their own approval window.
+`createGerolaminoTabSync()` broadcasts over a `BroadcastChannel` scoped by the browser to the origin:
+
+- detection snapshots are shared, so a tab reuses a fresh one (`< 5 s`) instead of probing again;
+- `beginApproval()` / `endApproval()` gives one approval window per origin: other tabs disable their
+  Connect button and say "approval open in another tab";
+- `connected` / `disconnected` transitions propagate, so the other tabs re-read instead of guessing.
+
+Payloads are validated before use (`parseTabEvent`), the sender never receives its own message, stale
+locks expire (approval 60 s, detection 120 s), and a missing `BroadcastChannel` degrades to a no-op.
+The element enables it by default and pauses polling while the tab is hidden, resuming with a jittered
+delay: `createGerolaminoConnect({ tabSync: false })` or `element.disableTabSync()` opts out.
+
 ## Browser element
 
 Include the standalone build once, then use the element in any framework or plain HTML:

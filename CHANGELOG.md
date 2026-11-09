@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.1
+
+Items 5 (tab safety) and 8 (disconnect honesty) from the Mandala review. `close()` gained fields, so this is a
+minor bump rather than a patch to 0.2.0.
+
+### Added
+
+- `createGerolaminoTabSync()` (`src/core/tabs.ts`): origin-scoped `BroadcastChannel` sharing of detection,
+  an approval lock (`beginApproval`/`endApproval`), and connect/disconnect transitions.
+  `parseTabEvent()` validates every inbound payload; self-messages are ignored; approval locks expire after
+  60 s and detection snapshots after 120 s; no `BroadcastChannel` means a silent no-op.
+- `disconnectAction(capabilities)` → `{ mode, label, revokeMethod }`: `"Revoke approval"` vs
+  `"Stop using Gerolamino on this site"`. `REVOKE_SETTINGS_HINT` is the shared "where the revoke actually
+  lives" sentence.
+- `interpretRevokeAnswer(answer)`: treats `undefined`/`null` as unconfirmed, not as a successful revoke.
+- Element: jittered polling (±25%), no polling while the tab is hidden, immediate refresh + jittered resume
+  on `visibilitychange`, a disabled Connect button while another tab holds the approval window, and the
+  disconnect label from `disconnectAction()`. `tabSync: false` / `disableTabSync()` opts out.
+
+### Changed
+
+- `GerolaminoDisconnectResult` is now `{ mode, revoked, verified, api?, method, message }`. A local close is
+  `revoked: false, verified: true` and its message says nothing was revoked; a revoke method that resolved
+  without confirming is `revoked: true, verified: false`; `{ revoked: false }` from the extension is
+  reported as not revoked.
+
 ## 0.2.0
 
 Breaking, deliberately small, and driven by the Mandala integration review.

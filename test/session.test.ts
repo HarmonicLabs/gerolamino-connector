@@ -62,6 +62,11 @@ describe("session", () => {
         const session = createGerolaminoSession(api(), extension());
         const result = await session.close();
         expect(result.mode).toBe("local");
+        expect(result.revoked).toBe(false);
+        expect(result.verified).toBe(true);
+        expect(result.method).toBe(null);
+        expect(result.message).toContain("nothing was revoked");
+        expect(result.message).toContain("Gerolamino Settings");
         expect(session.closed).toBe(true);
     });
 
@@ -71,7 +76,27 @@ describe("session", () => {
         const result = await session.close();
         expect(result.mode).toBe("extension");
         expect(result.method).toBe("disable");
+        expect(result.revoked).toBe(true);
+        expect(result.verified).toBe(false);   // resolved without confirming
+        expect(result.message).toContain("without confirming");
         expect(revoked).toBe(true);
+    });
+
+    test("close reports a confirmed revoke when the extension says so", async () => {
+        const session = createGerolaminoSession(api(), extension({ revoke: async () => ({ revoked: true }) } as any));
+        const result = await session.close();
+        expect(result.method).toBe("revoke");
+        expect(result.revoked).toBe(true);
+        expect(result.verified).toBe(true);
+        expect(result.api).toBe("object.revoked=true");
+    });
+
+    test("close does not claim a revoke the extension denied", async () => {
+        const session = createGerolaminoSession(api(), extension({ revoke: async () => ({ revoked: false }) } as any));
+        const result = await session.close();
+        expect(result.revoked).toBe(false);
+        expect(result.verified).toBe(true);
+        expect(result.message).toContain("did not revoke");
     });
 
     test("provider submitTx keeps the connector's hex validation", async () => {
@@ -88,7 +113,7 @@ describe("session", () => {
         expect(caps.canNetworkId).toBe(true);
         expect(caps.supportsRevoke).toBe(false);
         expect(caps.revokeMethod).toBe(null);
-        expect(caps.connectorVersion).toBe("0.2.0");
+        expect(caps.connectorVersion).toBe("0.2.1");
         expect(caps.apiVersion).toBe("1");
         expect(caps.needsReload).toBe(false);
         expect(session.getCapabilities()).toEqual(caps);
@@ -124,7 +149,7 @@ describe("session", () => {
     test("status carries the identity block", async () => {
         const session = createGerolaminoSession(api(), extension({ build: "2026.11.9-abc" }));
         const status = await session.status();
-        expect(status?.identity.connectorVersion).toBe("0.2.0");
+        expect(status?.identity.connectorVersion).toBe("0.2.1");
         expect(status?.identity.apiVersion).toBe("1");
         expect(status?.identity.dappApiVersion).toBe("0.1.0");
         expect(status?.identity.build).toBe("2026.11.9-abc");

@@ -1,7 +1,7 @@
 import { GerolaminoError, GerolaminoTimeoutError } from "./errors";
 import type { GerolaminoApi, GerolaminoExtension, GerolaminoProviderOptions, GerolaminoWindowLike } from "./types";
 
-export const CONNECTOR_VERSION = "0.2.0";
+export const CONNECTOR_VERSION = "0.2.1";
 export const GEROLAMINO_API_VERSION = "1";
 export const GEROLAMINO_DAPP_API_VERSION = "0.1.0";
 export const DEFAULT_DETECTION_TIMEOUT_MS = 5_000;

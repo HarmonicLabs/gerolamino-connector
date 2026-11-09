@@ -4,10 +4,14 @@
  */
 import {
     connectGerolamino,
+    createGerolaminoTabSync,
     detectGerolamino,
+    disconnectAction,
     type GerolaminoDetection,
     type GerolaminoNodeStatus,
     type GerolaminoSession,
+    type GerolaminoTabEvent,
+    type GerolaminoTabSync,
     type GerolaminoWindowLike
 } from "../core";
 
@@ -17,6 +21,8 @@ export interface GerolaminoConnectElementOptions {
     pollMs?: number;
     compact?: boolean;
     hideWhenAbsent?: boolean;
+    /** Share detection/approval state with other tabs on the same origin. Default true. */
+    tabSync?: boolean;
 }
 
 export class GerolaminoConnectElement extends HTMLElement {
@@ -35,6 +41,10 @@ export class GerolaminoConnectElement extends HTMLElement {
     private notice = "";
     private timer: number | null = null;
     private generation = 0;
+    private tabSync: GerolaminoTabSync | null = null;
+    private noTabSync = false;
+    private foreignApproval: { tabId: string; until: number } | null = null;
+    private detectedAt = 0;
 
     constructor() {
         super();
@@ -178,14 +188,20 @@ export class GerolaminoConnectElement extends HTMLElement {
     }
 
     connectedCallback(): void {
+        if (!this.tabSync && !this.noTabSync) {
+            this.tabSync = createGerolaminoTabSync();
+            this.tabSync.onUpdate(this.onTabEvent);
+        }
         this.schedulePoll();
         void this.refresh();
         document.addEventListener("visibilitychange", this.onVisibility);
     }
 
     disconnectedCallback(): void {
-        if (this.timer != null) window.clearInterval(this.timer);
+        if (this.timer != null) window.clearTimeout(this.timer);
         this.timer = null;
+        this.tabSync?.close();
+        this.tabSync = null;
         document.removeEventListener("visibilitychange", this.onVisibility);
     }
 
@@ -200,9 +216,12 @@ export class GerolaminoConnectElement extends HTMLElement {
         this.busy = true;
         this.notice = "";
         this.localOff = false;
+        this.tabSync?.beginApproval();
         try {
             const session = await connectGerolamino({ win: window as unknown as GerolaminoWindowLike });
             this.session = session;
+            this.tabSync?.endApproval(true);
+            this.tabSync?.publishConnected(session.capabilities.apiVersion);
             if (this.detection) {
                 this.detection = { ...this.detection, enabled: true, detail: "Gerolamino is installed and enabled for this site" };
             }
@@ -211,6 +230,7 @@ export class GerolaminoConnectElement extends HTMLElement {
             this.dispatch("gerolamino:connected", { session });
             return session;
         } catch (e) {
+            this.tabSync?.endApproval(false);
             this.notice = (e as Error)?.message ?? String(e);
             this.dispatch("gerolamino:error", { error: e });
             return null;
@@ -220,7 +240,10 @@ export class GerolaminoConnectElement extends HTMLElement {
         }
     }
 
-    /** Close the connector session. Revokes through the extension when that API exists; otherwise local only. */
+    /**
+     * Stop using Gerolamino on this page. When the extension exposes no page-callable revoke this is a local
+     * close only: the site stays approved, and the notice says so instead of implying a revoke.
+     */
     async disconnect(): Promise<void> {
         if (this.busy) return;
         this.busy = true;
@@ -231,6 +254,7 @@ export class GerolaminoConnectElement extends HTMLElement {
                 this.session = null;
                 this.status = null;
                 this.localOff = true;
+                this.tabSync?.publishDisconnected(result.revoked);
                 this.dispatch("gerolamino:disconnected", { result });
             } else {
                 this.localOff = true;
@@ -247,9 +271,33 @@ export class GerolaminoConnectElement extends HTMLElement {
     async refresh(): Promise<void> {
         if (this.busy) return;
         const generation = ++this.generation;
+        const shared = this.tabSync?.state().detection ?? null;
+        const sharedFresh = shared != null && Date.now() - shared.at < 5_000;
+        if (sharedFresh && generation === this.generation) {
+            this.detection = { ...shared!.detection };
+            this.detectedAt = shared!.at;
+            if (this.detection.status !== "present") {
+                this.session = null;
+                this.status = null;
+                this.render();
+                return;
+            }
+            if (this.detection.enabled === true && !this.session && !this.localOff) {
+                try {
+                    this.session = await connectGerolamino({ win: window as unknown as GerolaminoWindowLike, detectionTimeoutMs: 2_000 });
+                } catch {
+                    this.session = null;
+                }
+            }
+            if (this.session && this.session.closed === false) await this.refreshStatus();
+            this.render();
+            return;
+        }
         const detection = await detectGerolamino({ win: window as unknown as GerolaminoWindowLike, detectionTimeoutMs: 2_000 });
         if (generation !== this.generation) return;
         this.detection = detection;
+        this.detectedAt = Date.now();
+        this.tabSync?.publishDetection(detection);
         if (detection.status === "absent" || detection.status === "incompatible") {
             this.session = null;
             this.status = null;
@@ -287,15 +335,53 @@ export class GerolaminoConnectElement extends HTMLElement {
         }
     }
 
-    private schedulePoll(): void {
-        if (this.timer != null) window.clearInterval(this.timer);
+    private schedulePoll(delayMs?: number): void {
+        if (this.timer != null) window.clearTimeout(this.timer);
         this.timer = null;
         const ms = this.pollMs;
-        if (ms > 0 && this.isConnected) this.timer = window.setInterval(() => void this.refresh(), ms);
+        if (ms <= 0 || !this.isConnected) return;
+        // A hidden tab does not poll at all; visibilitychange resumes with a fresh read and a jittered delay.
+        if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+        const delay = delayMs ?? ms * (0.75 + Math.random() * 0.5);
+        this.timer = window.setTimeout(() => {
+            void this.refresh().finally(() => this.schedulePoll());
+        }, delay);
     }
 
     private onVisibility = () => {
-        if (document.visibilityState === "visible") void this.refresh();
+        if (typeof document === "undefined") return;
+        if (document.visibilityState === "hidden") {
+            if (this.timer != null) window.clearTimeout(this.timer);
+            this.timer = null;
+            return;
+        }
+        void this.refresh();
+        this.schedulePoll();
+    };
+
+    /** Another tab published state. Adopt detection, block a duplicate approval window, follow connect/disconnect. */
+    private onTabEvent = (event: GerolaminoTabEvent) => {
+        switch (event.type) {
+            case "detection":
+                if (event.at < this.detectedAt) return;
+                this.detection = { ...event.detection };
+                this.detectedAt = event.at;
+                break;
+            case "approval-start":
+                this.foreignApproval = { tabId: event.tabId, until: event.at + 60_000 };
+                break;
+            case "approval-end":
+                if (this.foreignApproval?.tabId === event.tabId) this.foreignApproval = null;
+                break;
+            case "connected":
+                void this.refresh();
+                return;
+            case "disconnected":
+                this.notice = "another tab stopped using Gerolamino on this site";
+                void this.refresh();
+                return;
+        }
+        this.render();
     };
 
     private dispatch(name: string, detail: unknown): void {
@@ -384,19 +470,27 @@ export class GerolaminoConnectElement extends HTMLElement {
 
         const actions = document.createElement("div");
         actions.className = "actions";
+        const foreign = this.foreignApproval != null && Date.now() < this.foreignApproval.until;
         if (this.detection?.status === "present" && !this.session) {
             const connect = document.createElement("button");
             connect.type = "button";
             connect.className = "connect";
-            connect.textContent = this.busy ? "connecting..." : "Connect Gerolamino";
-            connect.disabled = this.busy;
+            connect.textContent = foreign ? "approval open in another tab" : this.busy ? "connecting..." : "Connect Gerolamino";
+            connect.disabled = this.busy || foreign;
+            connect.title = foreign
+                ? "Another tab is showing the Gerolamino approval window for this site"
+                : "Open one Gerolamino approval window for this site";
             connect.addEventListener("click", () => void this.connect());
             actions.append(connect);
         }
         if (this.session) {
+            const action = disconnectAction(this.session.capabilities);
             const disconnect = document.createElement("button");
             disconnect.type = "button";
-            disconnect.textContent = this.busy ? "..." : "Disconnect";
+            disconnect.textContent = this.busy ? "..." : action.label;
+            disconnect.title = action.mode === "local"
+                ? "This build exposes no page-callable revoke: the connector stops here, the site stays approved"
+                : `Revoke this site's Gerolamino approval through ${action.revokeMethod}()`;
             disconnect.disabled = this.busy;
             disconnect.addEventListener("click", () => void this.disconnect());
             actions.append(disconnect);
@@ -460,6 +554,14 @@ export class GerolaminoConnectElement extends HTMLElement {
         return this.detection.detail;
     }
 
+    /** Opt out of cross-tab sharing: no BroadcastChannel is opened, polling/logic stay tab-local. */
+    disableTabSync(): void {
+        this.noTabSync = true;
+        this.tabSync?.close();
+        this.tabSync = null;
+        this.foreignApproval = null;
+    }
+
     private bindCore(): void {
         // Keep direct methods available on the element for framework wrappers.
         (this as any).connectGerolamino = () => this.connect();
@@ -472,6 +574,7 @@ export function createGerolaminoConnect(options: GerolaminoConnectElementOptions
     if (options.pollMs != null) element.pollMs = options.pollMs;
     if (options.compact != null) element.compact = options.compact;
     if (options.hideWhenAbsent != null) element.hideWhenAbsent = options.hideWhenAbsent;
+    if (options.tabSync === false) element.disableTabSync();
     return element;
 }
 

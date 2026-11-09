@@ -1,6 +1,6 @@
 {
     "name": "@harmoniclabs/gerolamino-connector",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Framework-neutral dApp connector for the Gerolamino browser node: prompt-free detection, explicit connect, node status, and a Blockfrost-shaped transport.",
     "license": "MIT",
     "author": "Harmonic Laboratories",

@@ -2,7 +2,7 @@
  * Capability flags. dApps should branch on these instead of sniffing `apiVersion`: a string comparison
  * cannot tell "legacy but fine" from "stale extension, reload needed".
  */
-import type { GerolaminoApi, GerolaminoCapabilities, GerolaminoDetection, GerolaminoExtension } from "./types";
+import type { GerolaminoApi, GerolaminoCapabilities, GerolaminoDetection, GerolaminoDisconnectAction, GerolaminoExtension } from "./types";
 import { CONNECTOR_VERSION, extensionBuild, isLegacyVersion } from "./util";
 
 /** Revoke-capable extension methods, in priority order. The first present one is the one `close()` calls. */
@@ -55,3 +55,18 @@ export function readCapabilities(
 export function markSubmitProvenance(capabilities: GerolaminoCapabilities, proven: boolean): GerolaminoCapabilities {
     return { ...capabilities, submitProvenance: proven };
 }
+
+/**
+ * What the disconnect control may honestly say. Gerolamino has no page-callable revoke today, so the
+ * button must not promise a revoke it cannot perform: it turns the connector off for this page only and
+ * the site stays approved in the extension.
+ */
+export function disconnectAction(capabilities: GerolaminoCapabilities): GerolaminoDisconnectAction {
+    if (capabilities.supportsRevoke) {
+        return { mode: "extension", label: "Revoke approval", revokeMethod: capabilities.revokeMethod };
+    }
+    return { mode: "local", label: "Stop using Gerolamino on this site", revokeMethod: null };
+}
+
+/** Point the user at the only place a revoke exists when the page cannot call one. */
+export const REVOKE_SETTINGS_HINT = "Revoke this site in Gerolamino Settings -> Connected sites.";

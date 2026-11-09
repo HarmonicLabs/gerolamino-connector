@@ -21,7 +21,7 @@ import type {
     GerolaminoDetection
 } from "./types";
 import { createGerolaminoProvider } from "./provider";
-import { markSubmitProvenance, readCapabilities } from "./capabilities";
+import { markSubmitProvenance, readCapabilities, REVOKE_METHODS, REVOKE_SETTINGS_HINT } from "./capabilities";
 import {
     CARDANO_NETWORK_MAGIC,
     CONNECTOR_VERSION,
@@ -184,27 +184,49 @@ export function createGerolaminoSession(
         },
         close: async (opts?: { timeoutMs?: number }): Promise<GerolaminoDisconnectResult> => {
             const timeoutMs = opts?.timeoutMs ?? 8_000;
-            const methods = ["revoke", "disable", "disconnect", "disableExtension"] as const;
-            for (const method of methods) {
+            for (const method of REVOKE_METHODS) {
                 const fn = (extension as any)[method];
                 if (typeof fn !== "function") continue;
+                let answer: unknown;
                 try {
-                    await withTimeout(fn.call(extension), timeoutMs, method);
-                    closed = true;
-                    capabilities = readCapabilities(api, extension, detection);
-                    return { mode: "extension", method, message: `approval revoked through ${method}()` };
+                    answer = await withTimeout(fn.call(extension), timeoutMs, method);
                 } catch (e) {
                     throw new GerolaminoError(`Gerolamino ${method}() failed: ${(e as Error)?.message ?? String(e)}`, {
                         kind: "REVOKE_FAILED",
                         cause: e
                     });
                 }
+                const verdict = interpretRevokeAnswer(answer);
+                closed = true;
+                capabilities = readCapabilities(api, extension, detection);
+                if (!verdict.revoked) {
+                    return {
+                        mode: "extension",
+                        revoked: false,
+                        verified: true,
+                        api: verdict.api,
+                        method,
+                        message: `${method}() ran but reported it did not revoke this site. ${REVOKE_SETTINGS_HINT}`
+                    };
+                }
+                return {
+                    mode: "extension",
+                    revoked: true,
+                    verified: verdict.verified,
+                    api: verdict.api,
+                    method,
+                    message: verdict.verified
+                        ? `approval revoked through ${method}()`
+                        : `${method}() resolved without confirming a revoke. Reads may still work: the site is still approved from the extension's side. ${REVOKE_SETTINGS_HINT}`
+                };
             }
             closed = true;
             return {
                 mode: "local",
+                revoked: false,
+                verified: true,
                 method: null,
-                message: "this Gerolamino build exposes no page-callable revoke; close is local, revoke the site in Gerolamino Settings"
+                message: `this Gerolamino build exposes no page-callable revoke, so nothing was revoked: the connector is off for this page only and the site stays approved. ${REVOKE_SETTINGS_HINT}`
             };
         }
     };
@@ -214,6 +236,23 @@ export function createGerolaminoSession(
 function normalizeNumber(value: unknown): number | null {
     const number = typeof value === "number" ? value : Number(value);
     return Number.isFinite(number) ? number : null;
+}
+
+/**
+ * Read what a revoke-capable extension method actually said. `undefined` is not a confirmation: a silent
+ * no-op is exactly the failure Mandala hit, so it must not be reported as a verified revoke.
+ */
+export function interpretRevokeAnswer(answer: unknown): { revoked: boolean; verified: boolean; api?: string } {
+    if (answer === undefined || answer === null) return { revoked: true, verified: false };
+    if (answer === true) return { revoked: true, verified: true, api: "true" };
+    if (answer === false) return { revoked: false, verified: true, api: "false" };
+    if (typeof answer === "object") {
+        const value = (answer as Record<string, unknown>).revoked;
+        if (value === true) return { revoked: true, verified: true, api: "object.revoked=true" };
+        if (value === false) return { revoked: false, verified: true, api: "object.revoked=false" };
+        return { revoked: true, verified: false, api: "object" };
+    }
+    return { revoked: true, verified: false, api: String(answer) };
 }
 
 export const sessionDefaults = {

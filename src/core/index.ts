@@ -9,6 +9,7 @@ export type {
     GerolaminoConnectOptions,
     GerolaminoDetection,
     GerolaminoDetectionStatus,
+    GerolaminoDisconnectAction,
     GerolaminoDisconnectResult,
     GerolaminoExtension,
     GerolaminoNetworkAssertion,
@@ -57,9 +58,33 @@ export {
 } from "./detect";
 
 export { connectGerolamino, enableGerolamino } from "./connect";
-export { createGerolaminoSession } from "./session";
+export { createGerolaminoSession, interpretRevokeAnswer } from "./session";
 export { createGerolaminoProvider, gerolaminoProvider, createGerolaminoFetch, answerError, normalizeSubmitResult } from "./provider";
-export { readCapabilities, needsReloadOf, revokeMethodOf, markSubmitProvenance, REVOKE_METHODS } from "./capabilities";
+export {
+    readCapabilities,
+    needsReloadOf,
+    revokeMethodOf,
+    markSubmitProvenance,
+    disconnectAction,
+    REVOKE_METHODS,
+    REVOKE_SETTINGS_HINT
+} from "./capabilities";
+
+export type {
+    GerolaminoTabChannel,
+    GerolaminoTabDetection,
+    GerolaminoTabEvent,
+    GerolaminoTabState,
+    GerolaminoTabSync,
+    GerolaminoTabSyncOptions
+} from "./tabs";
+
+export {
+    createGerolaminoTabSync,
+    parseTabEvent,
+    toTabDetection,
+    DEFAULT_TAB_CHANNEL
+} from "./tabs";
 
 export {
     GerolaminoError,

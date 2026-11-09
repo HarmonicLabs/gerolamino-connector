@@ -7,9 +7,12 @@ import {
     closeGerolamino,
     connectGerolamino,
     CONNECTOR_VERSION,
+    createGerolaminoTabSync,
     detectGerolamino,
+    disconnectAction,
     GerolaminoGatewaySilentError,
     hasGerolamino,
+    toTabDetection,
     type GerolaminoApi,
     type GerolaminoExtension,
     type GerolaminoWindowLike
@@ -71,8 +74,26 @@ if (shape.kind !== "GATEWAY_SILENT" || shape.status !== 503 || shape.path !== "/
     throw new Error(`error shape failed: ${JSON.stringify(shape)}`);
 }
 
+// Disconnect honesty: the control is labelled by what it can do, and a local close never claims a revoke.
+const action = disconnectAction(session.capabilities);
+if (action.label !== "Stop using Gerolamino on this site") throw new Error(`disconnect label failed: ${action.label}`);
 const close = await closeGerolamino(session);
-if (close.mode !== "local") throw new Error("close failed");
+if (close.mode !== "local" || close.revoked !== false || close.verified !== true) throw new Error(`close failed: ${JSON.stringify(close)}`);
+if (!close.message.includes("nothing was revoked")) throw new Error("local close message hides that nothing was revoked");
+
+// Tab safety: one approval lock and a shared detection snapshot across two tabs of the same origin.
+const channel = `smoke-${Date.now()}`;
+const tabA = createGerolaminoTabSync({ name: channel });
+const tabB = createGerolaminoTabSync({ name: channel });
+const tabSupported = tabA.supported;
+tabA.publishDetection(toTabDetection(detection as any));
+tabA.beginApproval();
+await new Promise((resolve) => setTimeout(resolve, 40));
+if (tabB.state().detection?.detection.legacyVersion !== false) throw new Error("tab detection not shared");
+if (tabB.state().approval?.tabId !== tabA.tabId) throw new Error("approval lock not shared");
+tabA.endApproval(true);
+tabA.close();
+tabB.close();
 
 console.log(JSON.stringify({
     status: "PASS",
@@ -83,5 +104,6 @@ console.log(JSON.stringify({
     network: { preview: onPreview.ok, preprod: onPreprod.ok, detail: onPreprod.detail },
     nodeStatus: { state: status.state, verdict: status.verdict, syncPercent: status.syncPercent, identity: status.identity },
     errorShape: shape,
-    close
+    disconnect: { label: action.label, ...close },
+    tabSync: { supported: tabSupported, sharedDetection: true, approvalLock: true }
 }, null, 2));
