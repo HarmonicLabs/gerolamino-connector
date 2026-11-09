@@ -146,7 +146,8 @@ const result = await session.close();
 // { mode: "extension" | "local", revoked: boolean, verified: boolean, api?: string, method, message }
 ```
 
-- `revoked: true` only when an extension revoke/disable method ran.
+- `revoked: true` only when a revoke actually ran: the enabled api's `revoke()` (Gerolamino 0.3.0+), else an
+  extension revoke/disable method.
 - `verified: false` when that method resolved without confirming (the silent no-op case): the message says
   the site may still be approved.
 - `mode: "local"` means nothing was revoked: the connector is off for this page only, the site stays

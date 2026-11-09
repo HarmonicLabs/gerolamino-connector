@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.2
+
+Gerolamino 0.3.0 exposes `revoke()` on the enabled api, so `close()` now uses it first and the disconnect
+becomes a real revoke instead of a local-only off.
+
+### Changed
+
+- `close()` prefers `api.revoke()` (reported as `method: "api.revoke"`), then the provider-level
+  `revoke`/`disable`/`disconnect`/`disableExtension` methods.
+- `capabilities.revokeMethod` reports `"api.revoke"` when the enabled api has it, so
+  `disconnectAction().label` becomes `"Revoke approval"` on that build.
+- `GerolaminoApi` types `revoke?(): Promise<unknown>`.
+
 ## 0.4.1
 
 Bug fix reported by Gravity against 0.3.0: `assertNetwork()` compared a CIP-30 **network id** against a

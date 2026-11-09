@@ -8,7 +8,12 @@ import { CONNECTOR_VERSION, extensionBuild, isLegacyVersion } from "./util";
 /** Revoke-capable extension methods, in priority order. The first present one is the one `close()` calls. */
 export const REVOKE_METHODS = ["revoke", "disable", "disconnect", "disableExtension"] as const;
 
-export function revokeMethodOf(extension: GerolaminoExtension | null | undefined): string | null {
+/**
+ * Which revoke path this build exposes, in priority order: the enabled api's `revoke()` (Gerolamino 0.3.0+),
+ * then the provider-level methods older builds were expected to add. The label is what `close()` reports.
+ */
+export function revokeMethodOf(extension: GerolaminoExtension | null | undefined, api?: GerolaminoApi | null): string | null {
+    if (api && typeof (api as any).revoke === "function") return "api.revoke";
     if (!extension) return null;
     for (const method of REVOKE_METHODS) {
         if (typeof (extension as any)[method] === "function") return method;
@@ -28,7 +33,7 @@ export function readCapabilities(
     extension: GerolaminoExtension,
     detection?: GerolaminoDetection | null
 ): GerolaminoCapabilities {
-    const revokeMethod = revokeMethodOf(extension);
+    const revokeMethod = revokeMethodOf(extension, api);
     const apiVersion = detection ? detection.apiVersion : extension.apiVersion == null ? null : String(extension.apiVersion);
     const dappApiVersion = detection ? detection.dappApiVersion : extension.dappApiVersion == null ? null : String(extension.dappApiVersion);
     const has = (key: keyof GerolaminoApi) => typeof (api as any)?.[key] === "function";

@@ -114,6 +114,11 @@ export interface GerolaminoApi {
     getAccount?(stakeAddress: string): Promise<GerolaminoAnswer>;
     getExtensions?(): Promise<unknown[]>;
     isEnabled?(): Promise<boolean>;
+    /**
+     * Gerolamino 0.3.0+: revoke THIS site's approval from the page. Resolves `{ revoked: boolean }` (older
+     * builds may resolve a bare boolean). The preferred path for `session.close()`.
+     */
+    revoke?(): Promise<unknown>;
     /** Present only if a build exposes an evaluate passthrough (none does today). */
     evaluate?(txCborHex: string, opts?: { version?: 5 | 6; additionalUtxos?: unknown }): Promise<GerolaminoAnswer>;
 }

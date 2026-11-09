@@ -219,14 +219,20 @@ export function createGerolaminoSession(
         },
         close: async (opts?: { timeoutMs?: number }): Promise<GerolaminoDisconnectResult> => {
             const timeoutMs = opts?.timeoutMs ?? 8_000;
+            // Gerolamino 0.3.0+ puts revoke on the enabled api; older builds were expected to add it to the
+            // provider. Try the api first, then the provider methods, in a fixed order.
+            const candidates: Array<{ owner: any; method: string; label: string }> = [];
+            if (typeof (api as any).revoke === "function") candidates.push({ owner: api, method: "revoke", label: "api.revoke" });
             for (const method of REVOKE_METHODS) {
-                const fn = (extension as any)[method];
-                if (typeof fn !== "function") continue;
+                if (typeof (extension as any)[method] === "function") candidates.push({ owner: extension, method, label: method });
+            }
+            for (const candidate of candidates) {
+                const fn = candidate.owner[candidate.method];
                 let answer: unknown;
                 try {
-                    answer = await withTimeout(fn.call(extension), timeoutMs, method);
+                    answer = await withTimeout(fn.call(candidate.owner), timeoutMs, candidate.method);
                 } catch (e) {
-                    throw new GerolaminoError(`Gerolamino ${method}() failed: ${(e as Error)?.message ?? String(e)}`, {
+                    throw new GerolaminoError(`Gerolamino ${candidate.label}() failed: ${(e as Error)?.message ?? String(e)}`, {
                         kind: "REVOKE_FAILED",
                         cause: e
                     });
@@ -240,8 +246,8 @@ export function createGerolaminoSession(
                         revoked: false,
                         verified: true,
                         api: verdict.api,
-                        method,
-                        message: `${method}() ran but reported it did not revoke this site. ${REVOKE_SETTINGS_HINT}`
+                        method: candidate.label,
+                        message: `${candidate.label}() ran but reported it did not revoke this site. ${REVOKE_SETTINGS_HINT}`
                     };
                 }
                 return {
@@ -249,10 +255,10 @@ export function createGerolaminoSession(
                     revoked: true,
                     verified: verdict.verified,
                     api: verdict.api,
-                    method,
+                    method: candidate.label,
                     message: verdict.verified
-                        ? `approval revoked through ${method}()`
-                        : `${method}() resolved without confirming a revoke. Reads may still work: the site is still approved from the extension's side. ${REVOKE_SETTINGS_HINT}`
+                        ? `approval revoked through ${candidate.label}()`
+                        : `${candidate.label}() resolved without confirming a revoke. Reads may still work: the site is still approved from the extension's side. ${REVOKE_SETTINGS_HINT}`
                 };
             }
             closed = true;
