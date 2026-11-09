@@ -124,18 +124,18 @@ describe("tab sync", () => {
 describe("disconnect honesty", () => {
     test("labels the control by what it can actually do", () => {
         const local = disconnectAction({
-            canQuery: true, canSubmit: true, canTip: true, canTrust: true, canNetworkId: true,
+            canQuery: true, canSubmit: true, canTip: true, canTrust: true, canNetworkId: true, canEvaluate: false,
             supportsRevoke: false, revokeMethod: null, submitProvenance: false,
-            connectorVersion: "0.2.1", apiVersion: "1", dappApiVersion: "0.1.0",
+            connectorVersion: "0.3.0", apiVersion: "1", dappApiVersion: "0.1.0",
             needsReload: false, build: null
         });
         expect(local.label).toBe("Stop using Gerolamino on this site");
         expect(local.mode).toBe("local");
 
         const revocable = disconnectAction({
-            canQuery: true, canSubmit: true, canTip: true, canTrust: true, canNetworkId: true,
+            canQuery: true, canSubmit: true, canTip: true, canTrust: true, canNetworkId: true, canEvaluate: false,
             supportsRevoke: true, revokeMethod: "revoke", submitProvenance: false,
-            connectorVersion: "0.2.1", apiVersion: "1", dappApiVersion: "0.1.0",
+            connectorVersion: "0.3.0", apiVersion: "1", dappApiVersion: "0.1.0",
             needsReload: false, build: null
         });
         expect(revocable.label).toBe("Revoke approval");

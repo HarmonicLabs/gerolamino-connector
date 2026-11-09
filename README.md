@@ -99,6 +99,32 @@ catch (e) {
 `GATEWAY_SILENT` is the official code for "connected but the node is not answering"; do not invent a
 private 503 semantic. The full table is in [`docs/ERRORS.md`](./docs/ERRORS.md).
 
+## Typed reads
+
+Path-string typos were the first consumers' most common integration bug, so the session ships typed reads
+that validate their identifier before it becomes a path segment:
+
+```ts
+const utxos = await session.addressUtxos(address);        // [] when the address has never been on chain
+const params = await session.protocolParameters();        // /epochs/latest/parameters
+const asset = await session.asset(unit);                  // null on 404
+const tx = await session.tx(hash);                        // 64-hex hash enforced
+const rows = await session.queryAll<Item>("/assets/{unit}/addresses");
+```
+
+Full set: `addressUtxos`, `addressTransactions`, `addressTotal`, `asset`, `assetAddresses`, `tx`, `txUtxos`,
+`scriptCbor`, `blockLatest`, `protocolParameters`, `genesis`, `queryAll`. Missing data is `[]`/`null` by
+default (a fresh address is not an error); pass `{ onMissing: "throw" }` when absence is a fault. Any other
+non-200, including 500, always throws. Validators are exported: `assertAddress`, `assertTxHash`,
+`assertScriptHash`, `assertAssetUnit`.
+
+## Ex-units note
+
+`session.evaluateTx(cbor, { version, additionalUtxos })` exists, but it throws `NOT_SUPPORTED` on every
+current build: the Gerolamino extension exposes no `evaluate` dApp method, so a page cannot reach the node's
+`POST /utils/txs/evaluate`. `capabilities.canEvaluate` is the feature flag to branch on. Keep a Blockfrost
+side channel for evaluation until the extension adds the method.
+
 ## Disconnect is honest
 
 Gerolamino exposes no page-callable revoke today, so "Disconnect" would be a lie. The session reports

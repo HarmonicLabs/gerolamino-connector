@@ -11,12 +11,16 @@ export type {
     GerolaminoDetectionStatus,
     GerolaminoDisconnectAction,
     GerolaminoDisconnectResult,
+    GerolaminoEvaluateOptions,
     GerolaminoExtension,
     GerolaminoNetworkAssertion,
     GerolaminoNetworkExpectation,
     GerolaminoNodeStatus,
+    GerolaminoAllPagesOptions,
+    GerolaminoPageOptions,
     GerolaminoProvider,
     GerolaminoProviderOptions,
+    GerolaminoReadHelpers,
     GerolaminoResponse,
     GerolaminoSession,
     GerolaminoSessionOptions,
@@ -60,6 +64,8 @@ export {
 export { connectGerolamino, enableGerolamino } from "./connect";
 export { createGerolaminoSession, interpretRevokeAnswer } from "./session";
 export { createGerolaminoProvider, gerolaminoProvider, createGerolaminoFetch, answerError, normalizeSubmitResult } from "./provider";
+export { createGerolaminoReads, assertAddress, assertTxHash, assertScriptHash, assertAssetUnit } from "./helpers";
+
 export {
     readCapabilities,
     needsReloadOf,
@@ -94,6 +100,7 @@ export {
     GerolaminoHttpError,
     GerolaminoGatewaySilentError,
     GerolaminoNetworkMismatchError,
+    GerolaminoNotSupportedError,
     errorFromUnknown
 } from "./errors";
 

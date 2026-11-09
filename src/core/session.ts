@@ -3,7 +3,7 @@
  * and never signs. `close()` uses a future extension revoke/disable method when present; otherwise it is
  * honest about a local-only close and points the user at Gerolamino Settings -> Connected sites.
  */
-import { GerolaminoError, GerolaminoGatewaySilentError, errorFromUnknown } from "./errors";
+import { GerolaminoError, GerolaminoGatewaySilentError, GerolaminoNotSupportedError, errorFromUnknown } from "./errors";
 import type {
     GerolaminoApi,
     GerolaminoCapabilities,
@@ -21,6 +21,7 @@ import type {
     GerolaminoDetection
 } from "./types";
 import { createGerolaminoProvider } from "./provider";
+import { createGerolaminoReads } from "./helpers";
 import { markSubmitProvenance, readCapabilities, REVOKE_METHODS, REVOKE_SETTINGS_HINT } from "./capabilities";
 import {
     CARDANO_NETWORK_MAGIC,
@@ -44,6 +45,7 @@ export function createGerolaminoSession(
     const requestTimeout = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     const submitTimeout = options.submitTimeoutMs ?? DEFAULT_SUBMIT_TIMEOUT_MS;
     const provider = createGerolaminoProvider(api, options);
+    const reads = createGerolaminoReads(provider);
     let capabilities: GerolaminoCapabilities = readCapabilities(api, extension, detection);
     let closed = false;
 
@@ -55,6 +57,7 @@ export function createGerolaminoSession(
     };
 
     const session: GerolaminoSession = {
+        ...reads,
         api,
         extension,
         provider,
@@ -181,6 +184,22 @@ export function createGerolaminoSession(
                 actual: { name: actualName, magic: actualMagic, networkId: actualNetworkId, tipNetwork },
                 detail
             };
+        },
+        evaluateTx: async (txCborHex: string, opts?: { version?: 5 | 6; additionalUtxos?: unknown; timeoutMs?: number }) => {
+            const evaluate = (api as any).evaluate;
+            if (typeof evaluate !== "function") {
+                throw new GerolaminoNotSupportedError(
+                    "this Gerolamino build exposes no evaluate() dApp method, so POST /utils/txs/evaluate is out of the connector's reach. The node serves it; the page cannot reach it until the extension adds an evaluate method.",
+                    { path: "/utils/txs/evaluate" }
+                );
+            }
+            const hex = String(txCborHex ?? "").replace(/^0x/i, "");
+            if (!isHex(hex)) throw new GerolaminoError("evaluateTx(cbor): a transaction as hex CBOR", { kind: "INVALID_REQUEST" });
+            return await withTimeout(
+                evaluate.call(api, hex, { version: opts?.version ?? 5, additionalUtxos: opts?.additionalUtxos }),
+                opts?.timeoutMs ?? requestTimeout,
+                "evaluateTx"
+            );
         },
         close: async (opts?: { timeoutMs?: number }): Promise<GerolaminoDisconnectResult> => {
             const timeoutMs = opts?.timeoutMs ?? 8_000;

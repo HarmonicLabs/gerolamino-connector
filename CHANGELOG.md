@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0
+
+Item 6 (typed helpers) from the Mandala review, plus the evaluate question Gravity raised. No breaking change
+to 0.2.x APIs; helper identifiers are validated, so a typo becomes `INVALID_REQUEST` instead of a bad path.
+
+### Added
+
+- `GerolaminoReadHelpers` on the session: `addressUtxos`, `addressTransactions`, `addressTotal`, `asset`,
+  `assetAddresses`, `tx`, `txUtxos`, `scriptCbor`, `blockLatest`, `protocolParameters`, `genesis`, `queryAll`.
+  Same 404 discipline as `provider.get()`: missing data is `[]`/`null` by default, `{ onMissing: "throw" }`
+  raises the typed HTTP error, and any other non-200 (500 included) always throws.
+- Validators exported and used by every helper: `assertAddress` (one path segment, no `/ ? #`),
+  `assertTxHash` (64 hex), `assertScriptHash` (56 hex), `assertAssetUnit` (56-hex policy + optional hex
+  name, or `lovelace`).
+- `session.evaluateTx(cbor, { version: 5 | 6, additionalUtxos? })` and `capabilities.canEvaluate`. The
+  Gerolamino extension exposes no `evaluate` dApp method today, so this throws
+  `GerolaminoNotSupportedError` (`kind: "NOT_SUPPORTED"`) with the reason; it uses the method automatically
+  when a build starts exposing one.
+- `GerolaminoNotSupportedError` and the `NOT_SUPPORTED` error kind.
+
+### Notes
+
+- `queryAll` is `provider.getAllPages` with the same count<=100 / short-page / `maxPages` rules.
+- `evaluateTx` is a page-reachable wrapper only. The Gerolamo node already serves
+  `POST /utils/txs/evaluate`; the missing piece is the extension method, not the node route.
+
 ## 0.2.1
 
 Items 5 (tab safety) and 8 (disconnect honesty) from the Mandala review. `close()` gained fields, so this is a

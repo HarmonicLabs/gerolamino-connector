@@ -74,6 +74,17 @@ if (shape.kind !== "GATEWAY_SILENT" || shape.status !== 503 || shape.path !== "/
     throw new Error(`error shape failed: ${JSON.stringify(shape)}`);
 }
 
+// Typed helpers: identifier-validated reads, and evaluateTx honest about the missing extension method.
+const total = await session.addressTotal("addr_test1smoke");
+if (!total) throw new Error("addressTotal helper failed");
+let notSupported = false;
+try {
+    await session.evaluateTx("abcdef");
+} catch (e: any) {
+    notSupported = e?.kind === "NOT_SUPPORTED";
+}
+if (!notSupported) throw new Error("evaluateTx must report NOT_SUPPORTED on this build");
+
 // Disconnect honesty: the control is labelled by what it can do, and a local close never claims a revoke.
 const action = disconnectAction(session.capabilities);
 if (action.label !== "Stop using Gerolamino on this site") throw new Error(`disconnect label failed: ${action.label}`);
@@ -101,6 +112,7 @@ console.log(JSON.stringify({
     capabilities: session.capabilities,
     answer: { status: answer.status, source: answer.source, requestId: answer.requestId },
     submit: submitted,
+    helpers: { addressTotal: true, evaluateTx: "NOT_SUPPORTED" },
     network: { preview: onPreview.ok, preprod: onPreprod.ok, detail: onPreprod.detail },
     nodeStatus: { state: status.state, verdict: status.verdict, syncPercent: status.syncPercent, identity: status.identity },
     errorShape: shape,

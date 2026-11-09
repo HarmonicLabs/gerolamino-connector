@@ -38,6 +38,7 @@ export function readCapabilities(
         canTip: has("getTip"),
         canTrust: has("getTrust"),
         canNetworkId: has("getNetworkId"),
+        canEvaluate: has("evaluate"),
         supportsRevoke: revokeMethod !== null,
         revokeMethod,
         // The 0.2 contract answers submitTx with an object. The provider normalizes either shape, but only

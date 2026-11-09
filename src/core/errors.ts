@@ -17,6 +17,7 @@ export type GerolaminoErrorKind =
     | "GATEWAY_SILENT"
     | "HTTP_ERROR"
     | "INVALID_REQUEST"
+    | "NOT_SUPPORTED"
     | "NETWORK_MISMATCH"
     | "REVOKE_FAILED"
     | "UNKNOWN";
@@ -153,6 +154,14 @@ export class GerolaminoHttpError extends GerolaminoError {
         this.name = "GerolaminoHttpError";
         this.status = status;
         this.body = body;
+    }
+}
+
+/** The installed build cannot do this at all (e.g. evaluate, revoke). Not a bug in the caller. */
+export class GerolaminoNotSupportedError extends GerolaminoError {
+    constructor(message: string, init: GerolaminoErrorInit = {}) {
+        super(message, { ...init, kind: "NOT_SUPPORTED" });
+        this.name = "GerolaminoNotSupportedError";
     }
 }
 

@@ -41,6 +41,8 @@ export interface GerolaminoCapabilities {
     canTip: boolean;
     canTrust: boolean;
     canNetworkId: boolean;
+    /** True only when the enabled api exposes `evaluate()`; none does today. */
+    canEvaluate: boolean;
     supportsRevoke: boolean;
     /** The extension method `close()` will call, or null when revoke is page-inaccessible. */
     revokeMethod: string | null;
@@ -98,6 +100,8 @@ export interface GerolaminoApi {
     getAccount?(stakeAddress: string): Promise<GerolaminoAnswer>;
     getExtensions?(): Promise<unknown[]>;
     isEnabled?(): Promise<boolean>;
+    /** Present only if a build exposes an evaluate passthrough (none does today). */
+    evaluate?(txCborHex: string, opts?: { version?: 5 | 6; additionalUtxos?: unknown }): Promise<GerolaminoAnswer>;
 }
 
 /** The provider object injected by the extension at `window.cardano.gerolamino`. */
@@ -210,6 +214,41 @@ export interface GerolaminoSessionOptions {
 
 export interface GerolaminoProviderOptions extends GerolaminoSessionOptions {}
 
+export interface GerolaminoPageOptions {
+    count?: number;
+    page?: number;
+    order?: "asc" | "desc";
+    /** `"empty"` (default) returns []/null on 404; `"throw"` raises the typed HTTP error. */
+    onMissing?: "empty" | "throw";
+}
+
+export interface GerolaminoAllPagesOptions {
+    count?: number;
+    maxPages?: number;
+}
+
+/** Typed reads. Identifiers are validated before they become a path segment. */
+export interface GerolaminoReadHelpers {
+    addressUtxos(address: string, opts?: GerolaminoPageOptions): Promise<unknown[]>;
+    addressTransactions(address: string, opts?: GerolaminoPageOptions): Promise<unknown[]>;
+    addressTotal(address: string): Promise<unknown | null>;
+    asset(unit: string): Promise<unknown | null>;
+    assetAddresses(unit: string, opts?: GerolaminoPageOptions): Promise<unknown[]>;
+    tx(hash: string): Promise<unknown | null>;
+    txUtxos(hash: string): Promise<unknown[]>;
+    scriptCbor(scriptHash: string): Promise<unknown | null>;
+    blockLatest(): Promise<unknown | null>;
+    protocolParameters(): Promise<unknown | null>;
+    genesis(): Promise<unknown | null>;
+    queryAll<T = unknown>(path: string, opts?: GerolaminoAllPagesOptions): Promise<T[]>;
+}
+
+export interface GerolaminoEvaluateOptions {
+    version?: 5 | 6;
+    additionalUtxos?: unknown;
+    timeoutMs?: number;
+}
+
 export interface GerolaminoProvider {
     readonly api: GerolaminoApi;
     get(path: string, init?: { count?: number; page?: number; order?: "asc" | "desc" }): Promise<GerolaminoAnswer>;
@@ -221,7 +260,7 @@ export interface GerolaminoProvider {
     submitTxId(txCborHex: string): Promise<string>;
 }
 
-export interface GerolaminoSession {
+export interface GerolaminoSession extends GerolaminoReadHelpers {
     readonly api: GerolaminoApi;
     readonly extension: GerolaminoExtension;
     readonly provider: GerolaminoProvider;
@@ -238,6 +277,11 @@ export interface GerolaminoSession {
     status(opts?: { timeoutMs?: number }): Promise<GerolaminoNodeStatus | null>;
     /** Compare the node's network with what the dApp expects. Reports, never throws. */
     assertNetwork(expected: GerolaminoNetworkExpectation, opts?: { timeoutMs?: number }): Promise<GerolaminoNetworkAssertion>;
+    /**
+     * Phase-2 evaluation passthrough. Throws `NOT_SUPPORTED` today: the Gerolamino extension exposes no
+     * `evaluate` dApp method, so a connector call cannot reach the node's POST /utils/txs/evaluate.
+     */
+    evaluateTx(txCborHex: string, opts?: GerolaminoEvaluateOptions): Promise<GerolaminoAnswer>;
     close(opts?: { timeoutMs?: number }): Promise<GerolaminoDisconnectResult>;
 }
 
