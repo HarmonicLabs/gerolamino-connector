@@ -202,13 +202,22 @@ The element no longer forces its own look. Set these custom properties on the el
 The legacy `--gc-*` names still work and now default to the `--gerolamino-*` values, so existing overrides
 keep applying. For structural changes the element exposes `::part()` hooks:
 
-`trigger`, `dot`, `label`, `caret`, `panel`, `title`, `row-key`, `row-value`, `trust`, `notice`,
-`button`, `connect`, `disconnect`, `close`, `footer`, `live`.
+`trigger`, `dot`, `label`, `caret`, `panel`, `title`, `subtitle`, `meter`, `facts`, `row-key`, `row-value`,
+`trust`, `chip`, `chip-dot`, `badges`, `badge`, `notice`, `actions`, `button`, `connect`, `disconnect`,
+`close`, `footer`, `hint`, `live`.
 
 ```css
 gerolamino-connect::part(panel) { width: 380px; }
 gerolamino-connect::part(button) { font-weight: 600; }
 ```
+
+### What the panel shows
+
+One line of identity (`Gerolamino` plus the network and state), one sync meter with the two tip numbers, a
+four-row fact grid (block, hash, api + dapp version, build), the trust rows as a labelled list with a tone
+per row, then the action. Warnings (`legacy contract`, `off for this page`) are badges, not buried sentences.
+The panel is clamped to the viewport: it opens right-aligned and flips to left-aligned when the widget sits
+near the left edge.
 
 ### Accessibility
 

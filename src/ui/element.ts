@@ -99,29 +99,58 @@ export class GerolaminoConnectElement extends HTMLElement {
             .caret { color: var(--gc-dim); font-size: 10px; }
             .panel {
                 position: absolute; right: 0; top: 40px; z-index: 2147483000;
-                width: 330px; padding: 12px;
+                width: 352px; max-width: calc(100vw - 16px); padding: 14px 14px 10px;
                 background: var(--gc-panel); color: var(--gc-text);
                 border: 1px solid var(--gc-border); border-radius: calc(var(--gc-radius) + 2px);
                 box-shadow: 0 12px 40px rgba(0,0,0,.5);
             }
             .panel[hidden] { display: none; }
-            .title { font-weight: 700; color: var(--gc-warn); margin-bottom: 7px; }
-            .grid { display: grid; grid-template-columns: 108px 1fr; gap: 4px 8px; margin-bottom: 9px; }
-            .k { color: var(--gc-dim); }
-            .v { color: var(--gc-text); overflow-wrap: anywhere; }
-            .notice { color: var(--gc-dim); margin-top: 8px; overflow-wrap: anywhere; }
-            .actions { display: flex; gap: 7px; margin-top: 9px; }
+            .title { font-size: 13px; font-weight: 700; color: var(--gc-text); letter-spacing: .2px; }
+            .sub { color: var(--gc-dim); font-size: 11px; margin: 2px 0 10px; }
+            .meter { margin-bottom: 10px; }
+            .meter-bar {
+                height: 6px; border-radius: 999px; overflow: hidden;
+                background: color-mix(in srgb, var(--gc-dim) 22%, transparent);
+            }
+            .meter-fill { height: 100%; border-radius: 999px; background: var(--gc-accent); transition: width .3s ease; }
+            .meter-text { color: var(--gc-dim); font-size: 10.5px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+            .grid { display: grid; grid-template-columns: 74px 1fr; gap: 3px 10px; margin-bottom: 10px; }
+            .k { color: var(--gc-dim); font-size: 11px; }
+            .v { color: var(--gc-text); font-size: 11.5px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+            .chips { display: grid; gap: 4px; margin-bottom: 10px; }
+            .chip {
+                display: flex; align-items: center; gap: 7px;
+                padding: 4px 8px; border-radius: 6px;
+                border: 1px solid var(--gc-border); color: var(--gc-dim); font-size: 10.5px;
+            }
+            .chip .dot { width: 6px; height: 6px; box-shadow: none; }
+            .chip-key { color: var(--gc-dim); }
+            .chip-val { margin-left: auto; color: var(--gc-text); font-variant-numeric: tabular-nums; }
+            .chip.ok .chip-val { color: var(--gc-ok); }
+            .chip.warn .chip-val { color: var(--gc-warn); }
+            .chip.bad .chip-val { color: var(--gc-bad); }
+            .chip.ok { color: var(--gc-ok); border-color: color-mix(in srgb, var(--gc-ok) 40%, var(--gc-border)); }
+            .chip.warn { color: var(--gc-warn); border-color: color-mix(in srgb, var(--gc-warn) 40%, var(--gc-border)); }
+            .chip.bad { color: var(--gc-bad); border-color: color-mix(in srgb, var(--gc-bad) 40%, var(--gc-border)); }
+            .badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+            .badge { padding: 3px 7px; border-radius: 6px; font-size: 10.5px; border: 1px solid var(--gc-border); }
+            .badge.warn { color: var(--gc-warn); border-color: color-mix(in srgb, var(--gc-warn) 45%, var(--gc-border)); }
+            .badge.dim { color: var(--gc-dim); }
+            .notice { color: var(--gc-dim); font-size: 11px; margin-top: 9px; overflow-wrap: anywhere; }
+            .actions { display: flex; gap: 7px; justify-content: flex-end; margin-top: 12px; }
             .actions button {
                 border: 1px solid var(--gc-border); border-radius: var(--gc-radius);
-                padding: 6px 10px; background: var(--gc-panel); color: var(--gc-text);
-                cursor: pointer; font: inherit;
+                padding: 7px 12px; background: var(--gc-panel); color: var(--gc-text);
+                cursor: pointer; font: inherit; font-size: 11.5px;
             }
+            .actions button:hover:not([disabled]) { border-color: var(--gc-dim); }
             .actions .connect { border-color: var(--gc-accent); color: var(--gc-accent); }
-            .trust { color: var(--gc-dim); font-size: 11px; line-height: 1.4; margin-top: 6px; overflow-wrap: anywhere; }
-            .footer { text-align: right; margin-top: 5px; }
-            .footer button { border: 0; background: transparent; color: var(--gc-dim); cursor: pointer; font: inherit; }
+            .footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--gc-border); }
+            .hint { color: var(--gc-dim); font-size: 10.5px; line-height: 1.35; max-width: 270px; }
+            .close { border: 0; background: transparent; color: var(--gc-dim); cursor: pointer; font: inherit; font-size: 12px; padding: 2px 4px; }
+            .close:hover { color: var(--gc-text); }
             .compact .label { letter-spacing: 0; }
-            .compact .panel { width: 290px; }
+            .compact .panel { width: 320px; }
             @media (prefers-color-scheme: light) {
                 :host {
                     --gc-panel: #fff; --gc-text: #181c24; --gc-dim: #68707e;
@@ -494,6 +523,7 @@ export class GerolaminoConnectElement extends HTMLElement {
         this.renderPanel();
         if (this.open) this.panel.hidden = false;
         else this.panel.hidden = true;
+        if (this.open) this.placePanel();
         if (this.compact) this.root.classList.add("compact");
         else this.root.classList.remove("compact");
         if (this.live) this.live.textContent = `${label}. ${this.detail() || ""}`.trim();
@@ -501,76 +531,99 @@ export class GerolaminoConnectElement extends HTMLElement {
 
     private renderPanel(): void {
         if (!this.panel) return;
-        const header = document.createElement("div");
-        header.className = "title";
-        header.id = "gc-title";
-        header.setAttribute("part", "title");
-        header.textContent = this.detection?.status === "absent"
+        const detection = this.detection;
+        const status = this.status;
+        const mk = (tag: string, cls: string, text?: string, part?: string): HTMLElement => {
+            const node = document.createElement(tag);
+            node.className = cls;
+            if (part) node.setAttribute("part", part);
+            if (text != null) node.textContent = text;
+            return node;
+        };
+        const fmt = (n: number | null | undefined): string => (n == null ? "—" : n.toLocaleString("en-US"));
+        // "preview" alone is ambiguous to a reader; these are testnets.
+        const networkLabel = (network: string | null | undefined): string | null =>
+            !network ? null : network === "preview" || network === "preprod" ? `${network} testnet` : network;
+
+        const parts: HTMLElement[] = [];
+
+        // Title: never repeat the name, and say what is wrong instead of showing a version number.
+        const name = detection?.name && detection.name.trim().toLowerCase() !== "gerolamino" ? ` · ${detection.name.trim()}` : "";
+        const header = mk("div", "title", detection?.status === "absent"
             ? "Gerolamino is not installed"
-            : this.detection?.status === "incompatible"
+            : detection?.status === "incompatible"
                 ? "Gerolamino version mismatch"
-                : `Gerolamino · ${this.detection?.name ?? "Gerolamino"}`;
+                : `Gerolamino${name}`, "title");
+        header.id = "gc-title";
+        parts.push(header);
 
-        const body = document.createElement("div");
-        const text = this.detection?.status === "absent"
-            ? "Install the Gerolamino browser extension, then reload this page and connect."
-            : this.detection?.status === "incompatible"
-                ? this.detection?.detail ?? "This page cannot use the installed Gerolamino API."
-                : "";
+        const enabled = !!this.session || detection?.enabled === true;
+        const subtitle = mk("div", "sub", detection?.status === "absent"
+            ? "Install the extension, then reload this page."
+            : detection?.status === "incompatible"
+                ? detection.detail
+                : [networkLabel(status?.network), enabled ? status?.state ?? (this.session ? "connected" : "awaiting status") : "not approved on this site"]
+                    .filter(Boolean).join(" · "), "subtitle");
+        parts.push(subtitle);
 
-        if (text) {
-            const p = document.createElement("div");
-            p.className = "v";
-            p.textContent = text;
-            body.append(p);
-        }
-
-        if (this.detection?.status === "present") {
-            const grid = document.createElement("div");
-            grid.className = "grid";
-            const row = (key: string, value: string) => {
-                const k = document.createElement("span");
-                k.className = "k";
-                k.setAttribute("part", "row-key");
-                k.textContent = key;
-                const v = document.createElement("span");
-                v.className = "v";
-                v.setAttribute("part", "row-value");
-                v.textContent = value;
-                grid.append(k, v);
-            };
-            row("installed", "yes");
-            row("enabled", this.session ? "yes" : this.detection.enabled === null ? "unknown" : this.detection.enabled ? "yes" : "no");
-            if (this.detection.apiVersion) row("api", this.detection.apiVersion);
-            if (this.detection.dappApiVersion) row("dapp api", this.detection.dappApiVersion);
-            if (this.detection.build) row("build", this.detection.build);
-            if (this.detection.needsReload) row("reload", "extension is on the legacy contract");
-            row("network", this.status?.network ?? (this.detection.enabled ? "awaiting status" : "awaiting enable"));
-            row("state", this.status?.state ?? (this.session ? "awaiting status" : "not connected"));
-            row("tip", this.status?.tipSlot != null ? String(this.status.tipSlot) : "—");
-            if (this.status?.peerSlot != null) row("peer", String(this.status.peerSlot));
-            if (this.status?.syncPercent != null) row("sync", `${this.status.syncPercent.toFixed(1)}%`);
-            if (this.status?.verdict) row("trust", this.status.verdict);
-            if (this.localOff) row("local", "off");
-            body.append(grid);
-            if (this.status?.trustRows?.length) {
-                const trust = document.createElement("div");
-                trust.className = "trust";
-                trust.setAttribute("part", "trust");
-                trust.textContent = this.status.trustRows.map((r) => `${r.label ?? r.key ?? ""}=${r.value ?? ""}${r.tone ? ` (${r.tone})` : ""}`).join(" · ");
-                body.append(trust);
+        if (detection?.status === "present") {
+            // One number that matters, as a meter rather than a wrapped sentence.
+            if (status?.syncPercent != null) {
+                const meter = mk("div", "meter", undefined, "meter");
+                const bar = mk("div", "meter-bar");
+                const fill = mk("div", "meter-fill");
+                fill.style.width = `${Math.min(100, Math.max(0, status.syncPercent))}%`;
+                const stateName = (status.state ?? "").toLowerCase();
+                const pct = status.syncPercent;
+                fill.style.background = stateName === "error" || stateName === "stopped"
+                    ? "var(--gc-bad)"
+                    : stateName === "at-tip" || pct >= 99.5
+                        ? "var(--gc-ok)"
+                        : "var(--gc-warn)";
+                bar.append(fill);
+                const label = mk("div", "meter-text", `${status.syncPercent.toFixed(1)}% synced · tip ${fmt(status.tipSlot)} / peer ${fmt(status.peerSlot)}`);
+                meter.append(bar, label);
+                parts.push(meter);
             }
+
+            const grid = mk("div", "grid", undefined, "facts");
+            const row = (key: string, value: string) => {
+                grid.append(mk("span", "k", key, "row-key"), mk("span", "v", value, "row-value"));
+            };
+            if (status?.tipHeight != null) row("block", fmt(status.tipHeight));
+            if (status?.tipHash) row("hash", `${status.tipHash.slice(0, 10)}…`);
+            const version = detection.apiVersion ? `v${detection.apiVersion}` : "—";
+            const dappApi = detection.dappApiVersion ? ` · dapp ${detection.dappApiVersion}` : "";
+            row("api", `${version}${dappApi}`);
+            if (detection.build) row("build", detection.build);
+            if (!status && enabled) row("status", "waiting for the first verified block");
+            if (grid.childElementCount) parts.push(grid);
+
+            // Trust rows as chips: each one is a datum with a tone, not a paragraph.
+            if (status?.trustRows?.length) {
+                const chips = mk("div", "chips", undefined, "trust");
+                for (const r of status.trustRows) {
+                    const tone = (r.tone ?? "").toLowerCase();
+                    const chip = mk("span", `chip${tone === "ok" || tone === "warn" || tone === "bad" ? ` ${tone}` : ""}`, undefined, "chip");
+                    chip.append(mk("span", "dot", undefined, "chip-dot"));
+                    chip.append(mk("span", "chip-key", r.label ?? r.key ?? ""));
+                    chip.append(mk("span", "chip-val", r.value ?? ""));
+                    chips.append(chip);
+                }
+                parts.push(chips);
+            }
+
+            const badges = mk("div", "badges", undefined, "badges");
+            if (detection.needsReload) badges.append(mk("span", "badge warn", "legacy contract · reload the extension", "badge"));
+            if (this.localOff) badges.append(mk("span", "badge dim", "off for this page · site still approved", "badge"));
+            if (badges.childElementCount) parts.push(badges);
         }
 
-        const actions = document.createElement("div");
-        actions.className = "actions";
+        const actions = mk("div", "actions", undefined, "actions");
         const foreign = this.foreignApproval != null && Date.now() < this.foreignApproval.until;
-        if (this.detection?.status === "present" && !this.session) {
-            const connect = document.createElement("button");
+        if (detection?.status === "present" && !this.session) {
+            const connect = mk("button", "connect", foreign ? "approval open in another tab" : this.busy ? "connecting..." : "Connect Gerolamino", "button connect") as HTMLButtonElement;
             connect.type = "button";
-            connect.className = "connect";
-            connect.setAttribute("part", "button connect");
-            connect.textContent = foreign ? "approval open in another tab" : this.busy ? "connecting..." : "Connect Gerolamino";
             connect.disabled = this.busy || foreign;
             connect.title = foreign
                 ? "Another tab is showing the Gerolamino approval window for this site"
@@ -580,10 +633,8 @@ export class GerolaminoConnectElement extends HTMLElement {
         }
         if (this.session) {
             const action = disconnectAction(this.session.capabilities);
-            const disconnect = document.createElement("button");
+            const disconnect = mk("button", "disconnect", this.busy ? "..." : action.label, "button disconnect") as HTMLButtonElement;
             disconnect.type = "button";
-            disconnect.setAttribute("part", "button disconnect");
-            disconnect.textContent = this.busy ? "..." : action.label;
             disconnect.title = action.mode === "local"
                 ? "This build exposes no page-callable revoke: the connector stops here, the site stays approved"
                 : `Revoke this site's Gerolamino approval through ${action.revokeMethod}()`;
@@ -591,28 +642,37 @@ export class GerolaminoConnectElement extends HTMLElement {
             disconnect.addEventListener("click", () => void this.disconnect());
             actions.append(disconnect);
         }
-        body.append(actions);
+        if (actions.childElementCount) parts.push(actions);
 
-        if (this.notice || this.detail()) {
-            const note = document.createElement("div");
-            note.className = "notice";
-            note.setAttribute("part", "notice");
-            note.textContent = this.notice || this.detail() || "";
-            body.append(note);
-        }
+        const note = this.notice || this.detail();
+        if (note) parts.push(mk("div", "notice", note, "notice"));
 
-        const footer = document.createElement("div");
-        footer.className = "footer";
-        footer.setAttribute("part", "footer");
-        const close = document.createElement("button");
+        const footer = mk("div", "footer", undefined, "footer");
+        footer.append(mk("span", "hint", "Reads and submits go through this extension, not a localhost port.", "hint"));
+        const close = mk("button", "close", "✕", "button close") as HTMLButtonElement;
         close.type = "button";
-        close.setAttribute("part", "button close");
         close.setAttribute("aria-label", "Close Gerolamino panel");
-        close.textContent = "close ✕";
         close.addEventListener("click", () => this.closePanel());
         footer.append(close);
+        parts.push(footer);
 
-        this.panel.replaceChildren(header, body, footer);
+        this.panel.replaceChildren(...parts);
+    }
+
+    /**
+     * Keep the panel inside the viewport. It is anchored to the trigger's right edge by default; when that
+     * would push it off the left of the screen (widget near the page edge), anchor it to the left instead.
+     */
+    private placePanel(): void {
+        const panel = this.panel;
+        if (!panel) return;
+        panel.style.left = "";
+        panel.style.right = "0px";
+        const rect = panel.getBoundingClientRect();
+        if (rect.width > 0 && rect.left < 8) {
+            panel.style.right = "auto";
+            panel.style.left = "0px";
+        }
     }
 
     private tone(): string {
@@ -626,7 +686,7 @@ export class GerolaminoConnectElement extends HTMLElement {
         if (state === "error" || state === "stopped" || verdict.includes("fail") || verdict.includes("red")) return "var(--gc-bad)";
         if (verdict.includes("warn") || verdict.includes("amber")) return "var(--gc-warn)";
         if (state === "at-tip") return "var(--gc-ok)";
-        if (state === "idle" || state === "connecting" || state === "handshake" || state === "anchoring") return "var(--gc-warn)";
+        if (state === "idle" || state === "connecting" || state === "handshake" || state === "anchoring" || state === "syncing") return "var(--gc-warn)";
         if (this.detection.enabled === true) return "var(--gc-accent)";
         return "var(--gc-dim)";
     }

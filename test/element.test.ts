@@ -34,7 +34,13 @@ function stubProvider(state: { enabled: boolean } = { enabled: false }) {
         query: async (path: string) => ({ status: 200, body: { path }, source: "local" }),
         submitTx: async () => "aa",
         getNetworkId: async () => 2,
-        getTip: async () => ({ slot: 1, height: 1, hash: "h", network: "preview", state: "at-tip" })
+        getNetwork: async () => "preview",
+        getTip: async () => ({ slot: 126902986, height: 4839875, hash: "d4121e20c81a0492", network: "preview", state: "syncing", peerTip: { slot: 127605497, height: 4841328 } }),
+        getTrust: async () => ({ verdict: "awaiting enable", rows: [
+            { label: "Block signatures", value: "awaiting headers", tone: "warn" },
+            { label: "Freshness", value: "18s", tone: "ok" },
+            { label: "Local UTxO", value: "stale, rebuild pending", tone: "warn" }
+        ] })
     };
     (window as any).cardano = {
         gerolamino: {
@@ -132,6 +138,39 @@ describe("element interaction", () => {
         const tab = new window.KeyboardEvent("keydown", { key: "Tab", bubbles: true });
         root.dispatchEvent(tab);
         expect(element.shadowRoot.activeElement).toBe(buttons[0]);
+        delete (window as any).cardano;
+    });
+
+    test("does not repeat the product name in the title", async () => {
+        stubProvider({ enabled: false });
+        const element = mount();
+        await tick();
+        const title = element.shadowRoot.querySelector("#gc-title") as any;
+        expect(title.textContent).toBe("Gerolamino");
+        const sub = element.shadowRoot.querySelector(".sub") as any;
+        expect(sub.textContent).toBe("not approved on this site");   // no network before approval
+        delete (window as any).cardano;
+    });
+
+    test("renders sync as a meter and trust rows as chips", async () => {
+        stubProvider({ enabled: true });
+        const element = mount();
+        await tick(60);
+        const trigger = element.shadowRoot.querySelector(".trigger") as any;
+        trigger.click();
+        await tick(80);
+        const meter = element.shadowRoot.querySelector(".meter");
+        expect(meter).not.toBe(null);
+        const text = element.shadowRoot.querySelector(".meter-text")!.textContent!;
+        expect(text).toContain("99.5% synced");
+        expect(element.shadowRoot.querySelector(".sub")!.textContent).toContain("preview testnet");
+        expect(text).toContain("tip 126,902,986");
+        const chips = Array.from(element.shadowRoot.querySelectorAll(".chip")) as any[];
+        expect(chips.length).toBe(3);
+        expect(chips[0].className).toBe("chip warn");
+        expect(chips[1].className).toBe("chip ok");
+        const grid = element.shadowRoot.querySelector(".grid") as any;
+        expect(grid.textContent).toContain("dapp");   // api row merges apiVersion + dappApiVersion
         delete (window as any).cardano;
     });
 

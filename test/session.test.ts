@@ -135,7 +135,7 @@ describe("session", () => {
         expect(caps.canNetworkId).toBe(true);
         expect(caps.supportsRevoke).toBe(false);
         expect(caps.revokeMethod).toBe(null);
-        expect(caps.connectorVersion).toBe("0.4.2");
+        expect(caps.connectorVersion).toBe("0.5.0");
         expect(caps.apiVersion).toBe("1");
         expect(caps.needsReload).toBe(false);
         expect(session.getCapabilities()).toEqual(caps);
@@ -171,7 +171,7 @@ describe("session", () => {
     test("status carries the identity block", async () => {
         const session = createGerolaminoSession(api(), extension({ build: "2026.11.9-abc" }));
         const status = await session.status();
-        expect(status?.identity.connectorVersion).toBe("0.4.2");
+        expect(status?.identity.connectorVersion).toBe("0.5.0");
         expect(status?.identity.apiVersion).toBe("1");
         expect(status?.identity.dappApiVersion).toBe("0.1.0");
         expect(status?.identity.build).toBe("2026.11.9-abc");

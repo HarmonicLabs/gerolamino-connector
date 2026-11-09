@@ -32,16 +32,19 @@
             query: async (path) => ({ status: 200, body: { path, demo: true, source: "local" }, source: "local" }),
             submitTx: async (hex) => `txid-${String(hex).slice(0, 8)}`,
             getNetworkId: async () => 0,
-            getTip: async () => ({ slot: 126619300, height: 9000, hash: "blockhash", network: "preview", state: "at-tip", peerTip: { slot: 126619360, height: 9001 } }),
-            getTrust: async () => ({ verdict: "verified", rows: [
-                { key: "signature", label: "Block signatures", value: "verified", tone: "ok" },
-                { key: "freshness", label: "Freshness", value: "1s", tone: "ok" }
+            getNetwork: async () => "preview",
+            getTip: async () => ({ slot: 126902986, height: 4839875, hash: "d4121e20c81a0492b0a1c7a0e6a2bb3e6c8f3b6f1c0d5a4e9f2b7c1d3e5a6b7c", network: "preview", state: "syncing", peerTip: { slot: 127605497, height: 4841328 } }),
+            getTrust: async () => ({ verdict: "awaiting enable", rows: [
+                { key: "signature", label: "Block signatures", value: "awaiting headers", tone: "warn" },
+                { key: "freshness", label: "Freshness", value: "18s", tone: "ok" },
+                { key: "utxo", label: "Local UTxO", value: "stale, rebuild pending", tone: "warn" }
             ] })
         };
         return {
-            name: "Gerolamino (demo stub)",
+            name: "Gerolamino",
             apiVersion: "1",
-            dappApiVersion: "0.1.0",
+            dappApiVersion: "0.2.0",
+            build: "gerolamino-0.3.0",
             isWallet: false,
             isEnabled: async () => enabled,
             enable: async () => { enabled = true; return api; }

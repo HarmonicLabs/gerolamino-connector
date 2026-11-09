@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.0
+
+Element redesign: the popover read as a wall of key/value text and a dot-joined sentence. Same information,
+shown as hierarchy.
+
+### Changed
+
+- Title no longer repeats the product name (`Gerolamino · Gerolamino` is gone); a subtitle carries
+  `network · state`, with `preview`/`preprod` labelled as testnets.
+- Sync is a meter with one line: `99.5% synced · tip 126,902,986 / peer 127,605,497`. Its colour follows the
+  state (green at tip, amber while syncing, red on error/stopped) instead of always using the accent.
+- Facts are a four-row grid: block, short hash, `api v1 · dapp 0.2.0`, build. Numbers use tabular figures.
+- Trust rows are a labelled list with the value right-aligned and tone-coloured, not a dot-joined paragraph.
+- `needsReload` and `off for this page` are badges; the action row is right-aligned.
+- Panel placement is clamped: flips from right- to left-anchored when it would leave the viewport.
+- Trigger tone: `syncing` is amber, not the accent.
+
+### Added
+
+- `::part()` hooks for the new structure: `subtitle`, `meter`, `facts`, `chip`, `chip-dot`, `badges`, `badge`,
+  `hint`, `actions`.
+
 ## 0.4.2
 
 Gerolamino 0.3.0 exposes `revoke()` on the enabled api, so `close()` now uses it first and the disconnect
